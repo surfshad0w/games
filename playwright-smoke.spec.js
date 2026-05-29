@@ -12,7 +12,7 @@ test("hub and every game opens on iPad viewport", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await page.screenshot({ path: "hub-ipad.png", fullPage: true });
 
-  await expect(page.locator(".game-card")).toHaveCount(8);
+  await expect(page.locator(".game-card")).toHaveCount(12);
   const names = await page.locator(".game-card h3").allTextContents();
 
   for (let index = 0; index < names.length; index += 1) {
@@ -44,6 +44,6 @@ test("hub loads when saved data is corrupt", async ({ page }) => {
 
   await page.goto("/", { waitUntil: "networkidle" });
 
-  await expect(page.locator(".game-card")).toHaveCount(8);
+  await expect(page.locator(".game-card")).toHaveCount(12);
   await expect(page.locator("#totalStars")).toHaveText("0");
 });

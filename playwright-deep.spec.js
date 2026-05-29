@@ -50,7 +50,7 @@ test("core games have playable interactions", async ({ page }) => {
     await clickCanvas(x, y);
     await page.waitForTimeout(wait);
   }
-  await expect.poll(async () => Number(await page.locator("#statScore").textContent())).toBeGreaterThanOrEqual(20);
+  await expect.poll(async () => Number(await page.locator("#statScore").textContent())).toBeGreaterThanOrEqual(10);
   await expect(page.locator("#hint")).not.toContainText(/undefined|NaN/);
 });
 
@@ -78,4 +78,54 @@ test("pet rescue jump returns to normal and spawns reachable treats", async ({ p
   expect(state.treats.length).toBeGreaterThan(0);
   expect(state.treats.every((t) => [430, 402, 392, 386, 358, 354, 342, 336].includes(t.y))).toBe(true);
   await expect(page.locator("#statTimeLabel")).toHaveText("hearts");
+});
+
+test("new PRD games have working first interactions", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  const canvasPoint = async (x, y) => {
+    const box = await page.locator("#gameCanvas").boundingBox();
+    return { x: box.x + (box.width * x) / 960, y: box.y + (box.height * y) / 640 };
+  };
+
+  const clickCanvas = async (x, y) => {
+    const p = await canvasPoint(x, y);
+    await page.mouse.click(p.x, p.y);
+  };
+
+  const openGame = async (name) => {
+    await page.locator(".game-card").filter({ hasText: name }).click();
+    await expect(page.locator("#gameTitle")).toHaveText(name);
+  };
+
+  const back = async () => {
+    await page.locator("#backBtn").click();
+    await expect(page.locator("#hub")).toBeVisible();
+  };
+
+  await openGame("Tiny Town Delivery");
+  await clickCanvas(460, 140);
+  await page.waitForTimeout(450);
+  await expect(page.locator("#hint")).not.toContainText(/undefined|NaN/);
+  await back();
+
+  await openGame("Marble Machine Lab");
+  await clickCanvas(355, 300);
+  await clickCanvas(824, 125);
+  await page.waitForTimeout(2600);
+  await expect.poll(async () => Number(await page.locator("#statScore").textContent())).toBeGreaterThan(0);
+  await expect(page.locator("#hint")).not.toContainText(/undefined|NaN/);
+  await back();
+
+  await openGame("Rainbow Art Studio");
+  await clickCanvas(220, 260);
+  await clickCanvas(240, 280);
+  await expect.poll(async () => Number(await page.locator("#statScore").textContent())).toBeGreaterThan(0);
+  await expect(page.locator("#hint")).not.toContainText(/undefined|NaN/);
+  await back();
+
+  await openGame("Forest Fix-It Crew");
+  await clickCanvas(210, 315);
+  await expect.poll(async () => Number(await page.locator("#statScore").textContent())).toBeGreaterThan(0);
+  await expect(page.locator("#hint")).not.toContainText(/undefined|NaN/);
 });

@@ -63,7 +63,11 @@ function loadArt(name, src) {
   ["golfSheet", "assets/generated/mini-golf-sprites.png"],
   ["cardSheet", "assets/generated/card-battle-sprites.png"],
   ["dungeonSheet", "assets/generated/dungeon-dash-sprites.png"],
-  ["avatarSheet", "assets/generated/avatar-studio-sprites.png"]
+  ["avatarSheet", "assets/generated/avatar-studio-sprites.png"],
+  ["tinyTownSheet", "assets/generated/new-games/tiny-town-delivery.png"],
+  ["marbleLabSheet", "assets/generated/new-games/marble-machine-lab.png"],
+  ["rainbowArtSheet", "assets/generated/new-games/rainbow-art-studio.png"],
+  ["forestFixSheet", "assets/generated/new-games/forest-fix-it-crew.png"]
 ].forEach(([name, src]) => loadArt(name, src));
 
 const sprites = {
@@ -114,6 +118,71 @@ const sprites = {
     wall: [95, 725, 400, 185],
     gem: [670, 725, 195, 180],
     door: [1030, 405, 355, 470]
+  },
+  tinyTown: {
+    scooter: [126, 116, 190, 188],
+    bakery: [672, 80, 251, 216],
+    flowers: [951, 90, 228, 204],
+    pets: [1211, 88, 250, 206],
+    park: [73, 352, 214, 167],
+    house: [318, 355, 216, 177],
+    library: [557, 345, 213, 181],
+    cupcake: [796, 355, 186, 158],
+    bouquet: [1029, 369, 163, 166],
+    bone: [1205, 412, 216, 89],
+    books: [78, 608, 206, 135],
+    balloons: [318, 578, 167, 219],
+    cone: [523, 604, 146, 123],
+    puddle: [700, 634, 249, 95],
+    cat: [973, 614, 247, 143],
+    star: [1286, 612, 158, 133]
+  },
+  marbleLab: {
+    ball: [105, 83, 155, 144],
+    launcher: [296, 85, 327, 204],
+    cup: [715, 80, 190, 214],
+    ramp: [927, 80, 300, 155],
+    curved: [671, 349, 276, 197],
+    button: [79, 346, 226, 170],
+    fan: [1026, 358, 206, 206],
+    sticky: [1255, 370, 204, 174],
+    magnet: [451, 597, 197, 173],
+    gem: [729, 653, 144, 118],
+    burst: [1240, 620, 217, 148],
+    arrow: [660, 846, 231, 78]
+  },
+  rainbowArt: {
+    brush: [87, 58, 207, 201],
+    bucket: [395, 74, 203, 168],
+    sheet: [649, 91, 237, 187],
+    undo: [1112, 96, 184, 116],
+    palette: [341, 352, 217, 94],
+    rainbow: [599, 354, 216, 113],
+    heart: [855, 344, 151, 124],
+    rocket: [1249, 329, 180, 167],
+    dog: [91, 551, 184, 141],
+    flower: [340, 549, 140, 154],
+    castle: [718, 570, 267, 116],
+    garden: [1031, 554, 186, 127],
+    frame: [111, 766, 230, 160],
+    spark: [490, 777, 197, 112]
+  },
+  forestFix: {
+    kid: [77, 75, 224, 327],
+    fox: [385, 78, 183, 203],
+    hammer: [637, 96, 147, 173],
+    water: [806, 89, 193, 169],
+    brush: [1024, 80, 145, 215],
+    bridge: [898, 335, 262, 139],
+    broom: [1345, 73, 125, 213],
+    brokenBridge: [554, 329, 295, 158],
+    path: [1232, 346, 261, 115],
+    tree: [1205, 518, 220, 256],
+    flower: [71, 639, 221, 75],
+    wilted: [327, 624, 185, 94],
+    pond: [603, 736, 294, 111],
+    bush: [980, 698, 211, 122],
+    sparkle: [1231, 804, 184, 169]
   }
 };
 
@@ -495,7 +564,11 @@ const gameDefs = [
   { id: "avatar-studio", title: "Avatar Studio", kicker: "Make a character", icon: "🎨", color: "linear-gradient(145deg, #f083ff, #54c6eb)", desc: "Mix faces, hats, colors, and stickers.", hint: "Tap the chips to design a character. Each new combo earns points.", starEvery: 60, create: createAvatarStudio },
   { id: "mini-golf", title: "Mini Golf Madness", kicker: "Aim and putt", icon: "⛳", color: "linear-gradient(145deg, #2cb67d, #ffd166)", desc: "Bounce around bumpers and sink putts.", hint: "Drag back from the ball, then let go to shoot.", starEvery: 55, create: createMiniGolf },
   { id: "card-battle", title: "Card Battle", kicker: "Pick powers", icon: "⚡", color: "linear-gradient(145deg, #9277ff, #ff6b6b)", desc: "Use funny powers to beat the boss.", hint: "Pick one card each turn. Stars, shields, and snacks help you win.", starEvery: 70, create: createCardBattle },
-  { id: "dungeon-dash", title: "Dungeon Dash", kicker: "Keys and treasure", icon: "🗝️", color: "linear-gradient(145deg, #26304d, #37d99e)", desc: "Find keys, dodge traps, grab gems.", hint: "Drag in the maze to move. Get the key, then the treasure.", starEvery: 85, create: createDungeonDash }
+  { id: "dungeon-dash", title: "Dungeon Dash", kicker: "Keys and treasure", icon: "🗝️", color: "linear-gradient(145deg, #26304d, #37d99e)", desc: "Find keys, dodge traps, grab gems.", hint: "Drag in the maze to move. Get the key, then the treasure.", starEvery: 85, create: createDungeonDash },
+  { id: "tiny-town", title: "Tiny Town Delivery", kicker: "Cozy town quests", icon: "🛵", color: "linear-gradient(145deg, #00a676, #ffd166)", desc: "Scoot through town and deliver silly packages.", hint: "Drag to steer. Pick up the glowing item, then deliver it to the matching stop.", starEvery: 95, create: createTinyTownDelivery },
+  { id: "marble-lab", title: "Marble Machine Lab", kicker: "Build and test", icon: "🔵", color: "linear-gradient(145deg, #4d96ff, #ffcf56)", desc: "Place toy parts and guide the marble home.", hint: "Tap a piece, tap a glowing slot, then press Play.", starEvery: 75, create: createMarbleMachineLab },
+  { id: "rainbow-art", title: "Rainbow Art Studio", kicker: "Paint and sticker", icon: "🖍️", color: "linear-gradient(145deg, #ff5c8a, #37d99e)", desc: "Make bright scenes with brushes and stickers.", hint: "Pick a tool, then draw or stamp on the canvas. Finish the prompt for bonus stars.", starEvery: 70, create: createRainbowArtStudio },
+  { id: "forest-fix", title: "Forest Fix-It Crew", kicker: "Repair and rescue", icon: "🧰", color: "linear-gradient(145deg, #2fbf71, #7c5cff)", desc: "Choose tools, fix forest problems, and find badges.", hint: "Tap the right tool, then tap the matching forest problem.", starEvery: 80, create: createForestFixItCrew }
 ];
 
 const games = Object.fromEntries(gameDefs.map((g) => [g.id, g]));
@@ -1043,6 +1116,510 @@ function createDungeonDash() {
       traps.forEach((tr) => { if (!drawSprite("dungeonSheet", sprites.dungeon.trap, tr.x, tr.y, 72, 42)) textCenter("✹", tr.x, tr.y, 52, "#ff6b6b"); });
       drawKidHero(hero.x, hero.y, 0.92);
       drawParticles();
+    }
+  };
+}
+
+function createTinyTownDelivery() {
+  const stops = [
+    { id: "bakery", name: "Bakery", icon: "🧁", sprite: "bakery", x: 150, y: 170, color: "#ff8f70" },
+    { id: "flowers", name: "Flowers", icon: "💐", sprite: "flowers", x: 460, y: 140, color: "#f083ff" },
+    { id: "pets", name: "Pet Shop", icon: "🦴", sprite: "pets", x: 770, y: 180, color: "#37d99e" },
+    { id: "library", name: "Library", icon: "📚", sprite: "library", x: 205, y: 480, color: "#4d96ff" },
+    { id: "park", name: "Park", icon: "🎈", sprite: "park", x: 520, y: 480, color: "#ffd166" },
+    { id: "house", name: "House", icon: "🏠", sprite: "house", x: 805, y: 465, color: "#ff6b6b" }
+  ];
+  const items = [
+    { icon: "🧁", sprite: "cupcake", from: "bakery" },
+    { icon: "💐", sprite: "bouquet", from: "flowers" },
+    { icon: "🦴", sprite: "bone", from: "pets" },
+    { icon: "📚", sprite: "books", from: "library" },
+    { icon: "🎈", sprite: "balloons", from: "park" }
+  ];
+  const hazards = [
+    { x: 342, y: 300, r: 28, icon: "💧", sprite: "puddle", w: 78, h: 42 },
+    { x: 642, y: 330, r: 26, icon: "🚧", sprite: "cone", w: 54, h: 50 },
+    { x: 705, y: 525, r: 25, icon: "🐾", sprite: "cat", w: 82, h: 50 }
+  ];
+  const player = { x: 110, y: 330, r: 26, speed: 265 };
+  let target = { x: player.x, y: player.y };
+  let hearts = 3, delivery = null, carrying = false, chain = 0, flash = 0, routeCount = 0;
+  function newDelivery() {
+    const item = choice(items);
+    let dest = choice(stops);
+    while (dest.id === item.from) dest = choice(stops);
+    delivery = { item, source: stops.find((s) => s.id === item.from), dest };
+    carrying = false;
+    routeCount += 1;
+    hint.textContent = "Pick up " + item.icon + " at " + delivery.source.name + ", then deliver to " + dest.name + ".";
+  }
+  newDelivery();
+  return {
+    time: 90,
+    pointerDown(x, y) { target = { x, y }; },
+    pointerMove(x, y) { if (pointer.down) target = { x, y }; },
+    stats() {
+      return { score: this.score, best: save.best[activeId] || 0, third: hearts, thirdLabel: "hearts" };
+    },
+    update(dt) {
+      if (this.time <= 0) gameOver("Town route done!");
+      flash = Math.max(0, flash - dt);
+      const dx = target.x - player.x, dy = target.y - player.y, len = Math.hypot(dx, dy) || 1;
+      const step = Math.min(player.speed * dt, len);
+      player.x = clamp(player.x + dx / len * step, 62, W - 62);
+      player.y = clamp(player.y + dy / len * step, 112, H - 64);
+      hazards.forEach((h) => {
+        if (flash <= 0 && Math.hypot(player.x - h.x, player.y - h.y) < player.r + h.r) {
+          hearts -= 1;
+          chain = 0;
+          flash = 0.85;
+          addScore(-8);
+          burst(player.x, player.y, ["#8bd3ff", "#ffffff", "#ff6b6b"], 18, 230);
+          hint.textContent = hearts > 0 ? "Careful around town! " + hearts + " hearts left." : "The route got too bumpy.";
+          if (hearts <= 0) gameOver("Delivery day done!");
+        }
+      });
+      if (!delivery || this.done) return;
+      const goal = carrying ? delivery.dest : delivery.source;
+      if (Math.hypot(player.x - goal.x, player.y - goal.y) < 64) {
+        if (!carrying) {
+          carrying = true;
+          addScore(15);
+          burst(goal.x, goal.y, ["#ffd166", "#fff", "#37d99e"], 20, 260);
+          hint.textContent = "Now deliver " + delivery.item.icon + " to " + delivery.dest.name + ".";
+        } else {
+          chain += 1;
+          addScore(30 + chain * 8);
+          burst(goal.x, goal.y, ["#ffd166", "#fff", "#f083ff", "#37d99e"], 28, 320);
+          newDelivery();
+        }
+      }
+    },
+    draw() {
+      gradientStage("#7ee8fa", "#95f985", "#ffd166");
+      ctx.fillStyle = "rgba(255,255,255,0.23)";
+      for (let i = 0; i < 8; i++) roundRect(38 + i * 125, 92 + (i % 2) * 352, 74, 16, 8, "rgba(255,255,255,0.28)");
+      ctx.strokeStyle = "rgba(255,255,255,0.62)";
+      ctx.lineWidth = 46;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(118, 330); ctx.lineTo(820, 330); ctx.moveTo(220, 145); ctx.lineTo(220, 500); ctx.moveTo(520, 145); ctx.lineTo(520, 500); ctx.moveTo(780, 170); ctx.lineTo(780, 480);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(77,96,130,0.2)";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([20, 20]);
+      ctx.beginPath(); ctx.moveTo(118, 330); ctx.lineTo(820, 330); ctx.stroke();
+      ctx.setLineDash([]);
+      drawTopHud((carrying ? "Deliver " : "Pick up ") + delivery.item.icon + "  •  trips " + Math.max(0, routeCount - 1), "#00a676");
+      stops.forEach((s) => {
+        const active = delivery && ((carrying && s.id === delivery.dest.id) || (!carrying && s.id === delivery.source.id));
+        ctx.save();
+        if (active) {
+          ctx.globalAlpha = 0.36 + Math.sin(performance.now() / 150) * 0.12;
+          ctx.fillStyle = "#fff66d";
+          ctx.beginPath(); ctx.arc(s.x, s.y, 70, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        if (!drawSprite("tinyTownSheet", sprites.tinyTown[s.sprite], s.x, s.y, 112, 86)) {
+          glossyRect(s.x - 48, s.y - 38, 96, 76, 20, s.color);
+          textCenter(s.icon, s.x, s.y - 4, 38);
+        }
+        ctx.restore();
+      });
+      hazards.forEach((h) => {
+        ctx.fillStyle = "rgba(0,0,0,0.14)";
+        ctx.beginPath(); ctx.ellipse(h.x, h.y + 12, h.r * 1.15, h.r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+        if (!drawSprite("tinyTownSheet", sprites.tinyTown[h.sprite], h.x, h.y, h.w, h.h)) textCenter(h.icon, h.x, h.y, 34);
+      });
+      ctx.save();
+      if (flash > 0) ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 45) * 0.25;
+      if (carrying) {
+        if (!drawSprite("tinyTownSheet", sprites.tinyTown[delivery.item.sprite], player.x, player.y - 38, 48, 42)) textCenter(delivery.item.icon, player.x, player.y - 42, 26);
+      }
+      if (!drawSprite("tinyTownSheet", sprites.tinyTown.scooter, player.x, player.y, 78, 66)) {
+        glossyRect(player.x - 33, player.y - 24, 66, 48, 20, "#ff5c8a");
+        textCenter("🛵", player.x, player.y - 2, 32);
+      }
+      ctx.restore();
+      drawParticles();
+      if (this.done) drawEndOverlay("Route complete", "Final score " + this.score);
+    }
+  };
+}
+
+function createMarbleMachineLab() {
+  const levels = [
+    { slots: [{ x: 355, y: 300, need: "ramp" }], goal: { x: 780, y: 430 }, start: { x: 150, y: 180 } },
+    { slots: [{ x: 330, y: 260, need: "ramp" }, { x: 570, y: 380, need: "bumper" }], goal: { x: 790, y: 480 }, start: { x: 140, y: 160 } },
+    { slots: [{ x: 320, y: 390, need: "fan" }, { x: 585, y: 250, need: "magnet" }], goal: { x: 790, y: 215 }, start: { x: 130, y: 455 } },
+    { slots: [{ x: 300, y: 270, need: "ramp" }, { x: 490, y: 390, need: "sticky" }, { x: 670, y: 300, need: "bumper" }], goal: { x: 815, y: 440 }, start: { x: 125, y: 180 } }
+  ];
+  const pieces = [
+    { id: "ramp", icon: "▰", sprite: "ramp", color: "#ffcf56" },
+    { id: "bumper", icon: "●", sprite: "button", color: "#ff6b6b" },
+    { id: "fan", icon: "✽", sprite: "fan", color: "#54c6eb" },
+    { id: "magnet", icon: "U", sprite: "magnet", color: "#9277ff" },
+    { id: "sticky", icon: "✦", sprite: "sticky", color: "#37d99e" }
+  ];
+  let level = 0, selected = "ramp", tries = 0, solving = false, marble = null, path = [], pathIndex = 0, hintPulse = 0, cleared = 0;
+  function current() { return levels[level]; }
+  function resetMarble() {
+    const l = current();
+    marble = { x: l.start.x, y: l.start.y, r: 18 };
+    solving = false;
+    path = [];
+    pathIndex = 0;
+  }
+  function pieceOk() {
+    return current().slots.every((s) => s.piece === s.need);
+  }
+  function playMachine(game) {
+    tries += 1;
+    const l = current();
+    path = [l.start, ...l.slots.map((s) => ({ x: s.x, y: s.y })), l.goal];
+    pathIndex = 1;
+    marble = { x: l.start.x, y: l.start.y, r: 18 };
+    solving = true;
+    hint.textContent = "Watch the marble roll.";
+    if (!pieceOk()) {
+      hintPulse = 1.4;
+      setTimeout(() => {
+        if (activeGame === game && solving && !pieceOk()) {
+          solving = false;
+          hint.textContent = "Try matching each glowing slot to the right toy part.";
+        }
+      }, 1200);
+    }
+  }
+  resetMarble();
+  return {
+    time: 180,
+    stats() {
+      return { score: this.score, best: save.best[activeId] || 0, third: level + 1, thirdLabel: "level" };
+    },
+    pointerDown(x, y) {
+      if (this.done) return;
+      const tray = pieces.find((p, i) => x > 92 + i * 118 && x < 188 + i * 118 && y > 526 && y < 614);
+      if (tray) {
+        selected = tray.id;
+        hint.textContent = "Now tap a glowing slot.";
+        return;
+      }
+      if (x > 748 && x < 900 && y > 92 && y < 158) {
+        playMachine(this);
+        return;
+      }
+      if (x > 590 && x < 730 && y > 92 && y < 158) {
+        current().slots.forEach((s) => delete s.piece);
+        resetMarble();
+        hint.textContent = "Slots cleared.";
+        return;
+      }
+      const slot = current().slots.find((s) => Math.hypot(x - s.x, y - s.y) < 54);
+      if (slot && !solving) {
+        slot.piece = selected;
+        addScore(4);
+        burst(slot.x, slot.y, ["#fff", "#ffd166", "#54c6eb"], 10, 180);
+      }
+    },
+    update(dt) {
+      hintPulse = Math.max(0, hintPulse - dt);
+      if (!solving || !marble || !path[pathIndex]) return;
+      const dest = path[pathIndex];
+      const dx = dest.x - marble.x, dy = dest.y - marble.y, len = Math.hypot(dx, dy) || 1;
+      const speed = pieceOk() ? 300 : 235;
+      const step = Math.min(speed * dt, len);
+      marble.x += dx / len * step;
+      marble.y += dy / len * step;
+      if (len < 8) {
+        pathIndex += 1;
+        if (!pieceOk() && pathIndex > 2) {
+          solving = false;
+          hint.textContent = "That machine missed the cup. Try another piece.";
+          return;
+        }
+        if (pathIndex >= path.length) {
+          solving = false;
+          cleared += 1;
+          addScore(34 + Math.max(0, 12 - tries));
+          burst(current().goal.x, current().goal.y, ["#ffd166", "#fff", "#37d99e"], 30, 330);
+          level = (level + 1) % levels.length;
+          tries = 0;
+          resetMarble();
+          hint.textContent = cleared >= levels.length ? "Full lab loop cleared. Keep experimenting!" : "Level cleared. Next machine!";
+        }
+      }
+    },
+    draw() {
+      gradientStage("#5ad7ff", "#8067ff", "#ffcf56");
+      stagePattern("rgba(255,255,255,0.12)", 80);
+      drawTopHud("Level " + (level + 1) + "  •  tries " + tries, "#ffcf56");
+      glossyRect(590, 92, 140, 66, 22, "rgba(255,255,255,0.28)");
+      textCenter("Reset", 660, 125, 23);
+      glossyRect(748, 92, 152, 66, 22, "#37d99e");
+      textCenter("Play", 824, 125, 28, "#102348");
+      const l = current();
+      if (!drawSprite("marbleLabSheet", sprites.marbleLab.launcher, l.start.x, l.start.y, 110, 78)) {
+        glossyRect(l.start.x - 42, l.start.y - 34, 84, 68, 24, "#ff8f70");
+        textCenter("↗", l.start.x, l.start.y, 34);
+      }
+      if (!drawSprite("marbleLabSheet", sprites.marbleLab.cup, l.goal.x, l.goal.y, 76, 80)) {
+        glossyRect(l.goal.x - 44, l.goal.y - 30, 88, 60, 24, "#ffffff");
+        textCenter("🏆", l.goal.x, l.goal.y, 34);
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.24)";
+      ctx.lineWidth = 12;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(l.start.x, l.start.y);
+      l.slots.forEach((s) => ctx.lineTo(s.x, s.y));
+      ctx.lineTo(l.goal.x, l.goal.y);
+      ctx.stroke();
+      l.slots.forEach((s) => {
+        const pulse = hintPulse > 0 && !s.piece ? Math.sin(performance.now() / 90) * 8 : 0;
+        const placed = pieces.find((p) => p.id === s.piece);
+        glossyRect(s.x - 48 - pulse / 2, s.y - 42 - pulse / 2, 96 + pulse, 84 + pulse, 24, placed ? "rgba(255,255,255,0.34)" : "rgba(255,255,255,0.28)");
+        if (placed && !drawSprite("marbleLabSheet", sprites.marbleLab[placed.sprite], s.x, s.y, 86, 64)) textCenter(placed.icon, s.x, s.y, 34, "#18233f");
+        if (!placed) textCenter("?", s.x, s.y, 34, "#ffffff");
+      });
+      pieces.forEach((p, i) => {
+        const x = 92 + i * 118, y = 526;
+        glossyRect(x, y, 96, 88, 24, p.id === selected ? "#fff66d" : p.color);
+        if (!drawSprite("marbleLabSheet", sprites.marbleLab[p.sprite], x + 48, y + 42, 62, 48)) textCenter(p.icon, x + 48, y + 42, 32, "#18233f");
+      });
+      if (marble) {
+        ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 16;
+        if (!drawSprite("marbleLabSheet", sprites.marbleLab.ball, marble.x, marble.y, 38, 38)) {
+          const g = ctx.createRadialGradient(marble.x - 7, marble.y - 8, 4, marble.x, marble.y, 24);
+          g.addColorStop(0, "#ffffff"); g.addColorStop(0.45, "#8bd3ff"); g.addColorStop(1, "#2448c7");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(marble.x, marble.y, marble.r, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+      drawParticles();
+    }
+  };
+}
+
+function createRainbowArtStudio() {
+  const tools = [
+    { id: "brush", label: "Brush", icon: "🖌️", sprite: "brush" },
+    { id: "fill", label: "Fill", icon: "🪣", sprite: "bucket" },
+    { id: "sticker", label: "Sticker", icon: "⭐", sprite: "rainbow" },
+    { id: "sparkle", label: "Sparkle", icon: "✨", sprite: "spark" },
+    { id: "done", label: "Done", icon: "✓", sprite: "frame" }
+  ];
+  const colors = ["#ff6b6b", "#ffd166", "#37d99e", "#54c6eb", "#9277ff", "#ffffff"];
+  const stickers = [
+    { icon: "⭐", sprite: "spark" },
+    { icon: "🌈", sprite: "rainbow" },
+    { icon: "🚀", sprite: "rocket" },
+    { icon: "🌸", sprite: "flower" },
+    { icon: "🐶", sprite: "dog" },
+    { icon: "💎", sprite: "heart" }
+  ];
+  const scenes = ["castle", "garden", "rocket", "ocean", "party"];
+  let scene = 0, tool = "brush", color = colors[0], sticker = 0, bg = "#fff8d8";
+  let marks = [], stampCount = 0, paintCount = 0, doneCount = 0, drawing = false, bounce = 0;
+  const area = { x: 60, y: 150, w: 840, h: 370 };
+  function inArea(x, y) { return x > area.x && x < area.x + area.w && y > area.y && y < area.y + area.h; }
+  function addMark(x, y) {
+    if (!inArea(x, y)) return;
+    if (tool === "brush") {
+      marks.push({ type: "dot", x, y, color, r: rand(10, 22) });
+      paintCount += 1;
+      addScore(1);
+    } else if (tool === "sticker") {
+      marks.push({ type: "sticker", x, y, sticker: stickers[sticker] });
+      sticker = (sticker + 1) % stickers.length;
+      stampCount += 1;
+      addScore(4);
+      burst(x, y, ["#fff", "#ffd166", "#f083ff"], 8, 160);
+    } else if (tool === "sparkle") {
+      marks.push({ type: "sparkle", x, y });
+      addScore(3);
+      bounce = 0.45;
+    } else if (tool === "fill") {
+      bg = color;
+      addScore(5);
+    }
+    if (stampCount >= 3 && paintCount >= 8) hint.textContent = "Prompt ready. Tap Done when you like it.";
+  }
+  return {
+    time: 120,
+    stats() {
+      return { score: this.score, best: save.best[activeId] || 0, third: doneCount, thirdLabel: "gallery" };
+    },
+    pointerDown(x, y) {
+      if (this.done) return;
+      const topTool = tools.find((t, i) => x > 64 + i * 118 && x < 166 + i * 118 && y > 84 && y < 134);
+      if (topTool) {
+        if (topTool.id === "done") {
+          const bonus = stampCount >= 3 && paintCount >= 8 ? 35 : 12;
+          doneCount += 1;
+          addScore(bonus);
+          burst(W / 2, 112, ["#ffd166", "#fff", "#37d99e", "#f083ff"], 34, 330);
+          hint.textContent = "Saved to the tiny gallery. New scene!";
+          marks = [];
+          stampCount = 0;
+          paintCount = 0;
+          scene = (scene + 1) % scenes.length;
+          bg = "#fff8d8";
+          return;
+        }
+        tool = topTool.id;
+        hint.textContent = topTool.label + " selected.";
+        return;
+      }
+      const swatch = colors.find((c, i) => x > 670 + i * 38 && x < 702 + i * 38 && y > 96 && y < 128);
+      if (swatch) {
+        color = swatch;
+        return;
+      }
+      drawing = true;
+      addMark(x, y);
+    },
+    pointerMove(x, y) {
+      if (drawing && tool === "brush") addMark(x, y);
+    },
+    pointerUp() { drawing = false; },
+    update(dt) {
+      bounce = Math.max(0, bounce - dt);
+      if (this.time <= 0) gameOver("Studio time!");
+    },
+    draw() {
+      gradientStage("#ff8fcf", "#54c6eb", "#37d99e");
+      stagePattern("rgba(255,255,255,0.16)", 82);
+      drawTopHud("Prompt: add 3 stickers and some color", "#f083ff");
+      tools.forEach((t, i) => {
+        const x = 64 + i * 118;
+        glossyRect(x, 84, 102, 50, 16, tool === t.id ? "#fff66d" : "rgba(255,255,255,0.24)");
+        if (!drawSprite("rainbowArtSheet", sprites.rainbowArt[t.sprite], x + 51, 109, 42, 36)) textCenter(t.icon, x + 51, 109, 25, "#18233f");
+      });
+      colors.forEach((c, i) => {
+        ctx.fillStyle = c;
+        ctx.beginPath(); ctx.roundRect(670 + i * 38, 96, 32, 32, 10); ctx.fill();
+        if (c === color) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.stroke(); }
+      });
+      glossyRect(area.x - 10, area.y - 10, area.w + 20, area.h + 20, 28, "rgba(255,255,255,0.36)", false);
+      roundRect(area.x, area.y, area.w, area.h, 22, bg);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(area.x, area.y, area.w, area.h); ctx.clip();
+      const sceneSprite = scenes[scene] === "castle" ? "castle" : scenes[scene] === "garden" ? "garden" : scenes[scene] === "rocket" ? "rocket" : "sheet";
+      if (!drawSprite("rainbowArtSheet", sprites.rainbowArt[sceneSprite], area.x + area.w / 2, area.y + area.h / 2, 210, 120)) {
+        textCenter(scenes[scene] === "castle" ? "🏰" : scenes[scene] === "garden" ? "🌷" : scenes[scene] === "rocket" ? "🚀" : scenes[scene] === "ocean" ? "🌊" : "🎉", area.x + area.w / 2, area.y + area.h / 2, 112, "rgba(35,48,77,0.2)");
+      }
+      marks.forEach((m, i) => {
+        if (m.type === "dot") {
+          ctx.fillStyle = m.color;
+          ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+        } else if (m.type === "sticker") {
+          const lift = bounce > 0 ? Math.sin(performance.now() / 60 + i) * 8 : 0;
+          if (!drawSprite("rainbowArtSheet", sprites.rainbowArt[m.sticker.sprite], m.x, m.y + lift, 54, 42)) textCenter(m.sticker.icon, m.x, m.y + lift, 36);
+        } else {
+          if (!drawSprite("rainbowArtSheet", sprites.rainbowArt.spark, m.x, m.y, 52, 36)) textCenter("✨", m.x, m.y, 34);
+        }
+      });
+      ctx.restore();
+      glossyRect(60, 548, 840, 52, 18, "rgba(255,255,255,0.22)", false);
+      textCenter("Paint " + paintCount + "  •  Stickers " + stampCount + "  •  Gallery " + doneCount, W / 2, 574, 24);
+      drawParticles();
+      if (this.done) drawEndOverlay("Gallery saved", "Final score " + this.score);
+    }
+  };
+}
+
+function createForestFixItCrew() {
+  const tools = [
+    { id: "hammer", icon: "🔨", sprite: "hammer", color: "#ffd166" },
+    { id: "water", icon: "💧", sprite: "water", color: "#54c6eb" },
+    { id: "snack", icon: "🍎", sprite: "fox", color: "#ff6b6b" },
+    { id: "brush", icon: "🧹", sprite: "broom", color: "#37d99e" }
+  ];
+  const allProblems = [
+    { id: "bridge", need: "hammer", icon: "🌉", sprite: "brokenBridge", x: 210, y: 315, label: "Fix bridge" },
+    { id: "flower", need: "water", icon: "🌼", sprite: "wilted", x: 430, y: 450, label: "Water flower" },
+    { id: "bird", need: "snack", icon: "🐦", sprite: "fox", x: 735, y: 250, label: "Feed bird" },
+    { id: "trail", need: "brush", icon: "🍂", sprite: "path", x: 645, y: 475, label: "Clear trail" },
+    { id: "sign", need: "hammer", icon: "🪧", sprite: "bridge", x: 330, y: 205, label: "Fix sign" },
+    { id: "sprout", need: "water", icon: "🌱", sprite: "flower", x: 805, y: 430, label: "Help sprout" }
+  ];
+  let selected = "hammer", fixed = 0, misses = 0, wave = 0;
+  let problems = allProblems.slice(0, 4).map((p) => ({ ...p, done: false }));
+  function nextWave() {
+    wave += 1;
+    const offset = wave % 3;
+    problems = allProblems.slice(offset, offset + 4).concat(allProblems.slice(0, Math.max(0, offset - 2))).slice(0, 4).map((p) => ({ ...p, done: false }));
+    hint.textContent = "New forest jobs. Pick the tool that matches the problem.";
+  }
+  return {
+    time: 95,
+    stats() {
+      return { score: this.score, best: save.best[activeId] || 0, third: fixed, thirdLabel: "fixed" };
+    },
+    pointerDown(x, y) {
+      if (this.done) return;
+      const tool = tools.find((t, i) => x > 150 + i * 150 && x < 256 + i * 150 && y > 526 && y < 612);
+      if (tool) {
+        selected = tool.id;
+        hint.textContent = tool.icon + " selected.";
+        return;
+      }
+      const p = problems.find((job) => !job.done && Math.hypot(x - job.x, y - job.y) < 62);
+      if (!p) return;
+      if (p.need === selected) {
+        p.done = true;
+        fixed += 1;
+        addScore(24 + Math.max(0, 8 - misses));
+        burst(p.x, p.y, ["#ffd166", "#fff", "#37d99e"], 24, 280);
+        hint.textContent = p.label + " complete.";
+        if (problems.every((job) => job.done)) {
+          addScore(35);
+          nextWave();
+        }
+      } else {
+        misses += 1;
+        addScore(-4);
+        burst(p.x, p.y, ["#ff6b6b", "#fff"], 8, 160);
+        hint.textContent = "Try a different tool for that job.";
+      }
+    },
+    update() {
+      if (this.time <= 0) gameOver("Forest shift done!");
+    },
+    draw() {
+      gradientStage("#92f38f", "#28c5a2", "#7c5cff");
+      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      ctx.beginPath(); ctx.arc(800, 110, 58, 0, Math.PI * 2); ctx.fill();
+      for (let i = 0; i < 9; i++) {
+        const x = 55 + i * 110;
+        glossyRect(x, 400 + (i % 3) * 18, 42, 118, 20, "#7a5a37", false);
+        ctx.fillStyle = i % 2 ? "#1fae70" : "#37d99e";
+        ctx.beginPath(); ctx.arc(x + 20, 380 + (i % 3) * 18, 54, 0, Math.PI * 2); ctx.fill();
+      }
+      drawTopHud("Choose a tool, fix the forest  •  wave " + (wave + 1), "#37d99e");
+      problems.forEach((p) => {
+        if (p.done) {
+          ctx.globalAlpha = 0.55;
+          glossyRect(p.x - 48, p.y - 42, 96, 84, 24, "rgba(255,255,255,0.26)");
+          textCenter("✓", p.x, p.y, 48, "#102348");
+          ctx.globalAlpha = 1;
+          return;
+        }
+        const tool = tools.find((t) => t.id === p.need);
+        glossyRect(p.x - 54, p.y - 46, 108, 92, 26, "rgba(255,255,255,0.82)");
+        if (!drawSprite("forestFixSheet", sprites.forestFix[p.sprite], p.x, p.y - 8, 82, 58)) textCenter(p.icon, p.x, p.y - 8, 42, "#102348");
+        ctx.fillStyle = tool.color;
+        ctx.beginPath(); ctx.arc(p.x + 38, p.y + 30, 18, 0, Math.PI * 2); ctx.fill();
+      });
+      tools.forEach((t, i) => {
+        const x = 150 + i * 150;
+        glossyRect(x, 526, 106, 86, 24, selected === t.id ? "#fff66d" : t.color);
+        if (!drawSprite("forestFixSheet", sprites.forestFix[t.sprite], x + 53, 568, 58, 54)) textCenter(t.icon, x + 53, 568, 34, "#102348");
+      });
+      drawParticles();
+      if (this.done) drawEndOverlay("Forest fixed", "Final score " + this.score);
     }
   };
 }
