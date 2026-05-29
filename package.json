@@ -1,0 +1,12 @@
+{
+  "name": "ara-games",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "python3 -m http.server 4173 --directory .",
+    "test": "playwright test --browser=chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

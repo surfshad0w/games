@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#141827">
+  <title>games.araand.co</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="app" class="shell">
+    <section id="hub" class="hub">
+      <header class="topbar">
+        <div class="brand-mark" aria-label="games.araand.co">games.araand.co</div>
+        <div class="score-pill" aria-label="Total stars">
+          <span id="totalStars">0</span>
+          <span>stars</span>
+        </div>
+      </header>
+
+      <section class="hero" aria-label="Game picker">
+        <div class="hero-copy">
+          <h2>Pick a game</h2>
+          <p>Fast, silly, touch-friendly games for iPad play.</p>
+        </div>
+        <button id="surpriseBtn" class="primary-btn" type="button">Surprise Me</button>
+      </section>
+
+      <section id="gameGrid" class="game-grid" aria-label="Games"></section>
+    </section>
+
+    <section id="play" class="play hidden" aria-live="polite">
+      <header class="playbar">
+        <button id="backBtn" class="icon-btn" type="button" aria-label="Back to games">‹</button>
+        <div>
+          <p id="gameKicker" class="eyebrow">Now playing</p>
+          <h2 id="gameTitle">Game</h2>
+        </div>
+        <button id="restartBtn" class="secondary-btn" type="button">Restart</button>
+      </header>
+
+      <div class="stats">
+        <div><span id="statScore">0</span><small id="statScoreLabel">score</small></div>
+        <div><span id="statBest">0</span><small id="statBestLabel">best</small></div>
+        <div><span id="statTime">0</span><small id="statTimeLabel">time</small></div>
+      </div>
+
+      <div class="stage-wrap">
+        <canvas id="gameCanvas" width="960" height="640" aria-label="Game canvas"></canvas>
+        <div id="domStage" class="dom-stage hidden"></div>
+      </div>
+
+      <div id="controls" class="controls"></div>
+      <p id="hint" class="hint"></p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
