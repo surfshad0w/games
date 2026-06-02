@@ -12,12 +12,13 @@ test("hub and every game opens on iPad viewport", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await page.screenshot({ path: "hub-ipad.png", fullPage: true });
 
-  await expect(page.locator(".game-card")).toHaveCount(5);
+  await expect(page.locator(".game-card")).toHaveCount(6);
   const names = await page.locator(".game-card h3").allTextContents();
   expect(names).toEqual([
     "Gem Pop Arcade",
     "Pet Rescue Run",
     "Space Miner",
+    "Fireline Rescue",
     "Mini Golf Madness",
     "Rainbow Art Studio"
   ]);
@@ -46,6 +47,6 @@ test("hub loads when saved data is corrupt", async ({ page }) => {
 
   await page.goto("/", { waitUntil: "networkidle" });
 
-  await expect(page.locator(".game-card")).toHaveCount(5);
+  await expect(page.locator(".game-card")).toHaveCount(6);
   await expect(page.locator("#totalStars")).toHaveText("0");
 });

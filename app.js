@@ -210,21 +210,24 @@ function bindCanvas() {
   const down = (e) => {
     e.preventDefault();
     const p = scaleEvent(e);
+    if (e.pointerId != null && canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch {}
+    }
     pointer = { ...pointer, ...p, down: true, justDown: true };
-    activeGame?.pointerDown?.(p.x, p.y);
+    activeGame?.pointerDown?.(p.x, p.y, e);
   };
   const move = (e) => {
     if (!pointer.down && e.type.startsWith("touch")) return;
     e.preventDefault();
     const p = scaleEvent(e);
     pointer = { ...pointer, ...p };
-    activeGame?.pointerMove?.(p.x, p.y);
+    activeGame?.pointerMove?.(p.x, p.y, e);
   };
   const up = (e) => {
     e.preventDefault();
     const p = scaleEvent(e);
     pointer = { ...pointer, ...p, down: false, justUp: true };
-    activeGame?.pointerUp?.(p.x, p.y);
+    activeGame?.pointerUp?.(p.x, p.y, e);
   };
   if (window.PointerEvent) {
     canvas.addEventListener("pointerdown", down);
@@ -490,6 +493,7 @@ const gameDefs = [
   { id: "gem-pop", title: "Gem Pop Arcade", kicker: "Tap the matching gems", icon: "💎", color: "linear-gradient(145deg, #ff6b6b, #f083ff)", desc: "Pop color groups before time runs out.", hint: "Tap big groups of matching gems. Bigger groups make bigger points.", starEvery: 120, create: createGemPop },
   { id: "pet-rescue", title: "Pet Rescue Run", kicker: "Jump and collect", icon: "🐶", color: "linear-gradient(145deg, #37d99e, #54c6eb)", desc: "Run, jump, grab treats, and rescue pets.", hint: "Use Jump to hop over puddles and collect treats.", starEvery: 80, controls: [{ id: "jump", label: "Jump" }], create: createPetRescue },
   { id: "space-miner", title: "Space Miner", kicker: "Fly and dodge", icon: "🚀", color: "linear-gradient(145deg, #315c9d, #8bd3ff)", desc: "Collect crystals while avoiding asteroids.", hint: "Drag anywhere to steer the ship.", starEvery: 100, create: createSpaceMiner },
+  { id: "fireline-rescue", title: "Fireline Rescue", kicker: "Spray and survive", icon: "🚒", color: "linear-gradient(145deg, #20362f, #ff6b3d)", desc: "Move, aim, and put out wildfires before they escape.", hint: "Tap the canvas to start. Left side moves, right side aims and sprays. Keyboard: WASD or arrows plus Space.", starEvery: 260, create: createFirelineRescue },
   { id: "mini-golf", title: "Mini Golf Madness", kicker: "Aim and putt", icon: "⛳", color: "linear-gradient(145deg, #2cb67d, #ffd166)", desc: "Bounce around bumpers and sink putts.", hint: "Drag back from the ball, then let go to shoot.", starEvery: 55, create: createMiniGolf },
   { id: "rainbow-art", title: "Rainbow Art Studio", kicker: "Paint and sticker", icon: "🖍️", color: "linear-gradient(145deg, #ff5c8a, #37d99e)", desc: "Make bright scenes with brushes and stickers.", hint: "Pick a tool, then draw or stamp on the canvas. Finish the prompt for bonus stars.", starEvery: 70, create: createRainbowArtStudio }
 ];
@@ -814,6 +818,788 @@ function createSpaceMiner() {
       drawParticles();
     }
   };
+}
+
+function createFirelineRescue() {
+  const FW = 1366;
+  const FH = 1024;
+  const input = {
+    movePointer: null,
+    aimPointer: null,
+    moveStart: { x: 0, y: 0 },
+    moveNow: { x: 0, y: 0 },
+    aim: { x: FW * 0.74, y: FH * 0.5 },
+    spraying: false,
+    keys: new Set()
+  };
+
+  let firefighter;
+  let fires;
+  let terrain;
+  let waterDrops;
+  let steamPuffs;
+  let water;
+  let state;
+  let spawnTimer = 0;
+  let elapsedTime = 0;
+  let firesPutOut = 0;
+  let combo = 1;
+  let comboTimer = 0;
+  let bonusText = "Ready";
+  let bonusTimer = 0;
+  let messageTitle = "Fireline Rescue";
+  let messageBody = "Move with your left thumb. Aim and spray with your right thumb. Keep putting out fires for the highest score.";
+  let messageButton = "Tap to start";
+
+  const game = {
+    stats() {
+      return {
+        score: this.score,
+        best: save.best[activeId] || 0,
+        third: Math.max(0, Math.round(water)),
+        thirdLabel: "water"
+      };
+    },
+    pointerDown(x, y, event) {
+      const point = toFirePoint(x, y);
+      const id = pointerId(event);
+      if (state !== "playing") {
+        resetRound();
+        startRound();
+        return;
+      }
+
+      if (point.x < FW * 0.43 && input.movePointer === null) {
+        input.movePointer = id;
+        input.moveStart = point;
+        input.moveNow = point;
+      } else {
+        input.aimPointer = id;
+        input.aim = point;
+        input.spraying = true;
+      }
+    },
+    pointerMove(x, y, event) {
+      if (state !== "playing") return;
+      const point = toFirePoint(x, y);
+      const id = pointerId(event);
+
+      if (id === input.movePointer) input.moveNow = point;
+      if (id === input.aimPointer) input.aim = point;
+      if (input.aimPointer === null && id !== input.movePointer) input.aim = point;
+    },
+    pointerUp(_x, _y, event) {
+      const id = pointerId(event);
+      if (id === input.movePointer) input.movePointer = null;
+      if (id === input.aimPointer) {
+        input.aimPointer = null;
+        input.spraying = false;
+      }
+    },
+    update(dt) {
+      updateFireline(dt);
+    },
+    draw() {
+      ctx.save();
+      ctx.scale(W / FW, H / FH);
+      drawFireline();
+      ctx.restore();
+    },
+    destroy() {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("mouseup", onMouseUp);
+    },
+    debugState() {
+      return {
+        state,
+        water: Math.round(water),
+        fires: fires.filter((fire) => fire.health > 0).length,
+        firefighter: { x: Math.round(firefighter.x), y: Math.round(firefighter.y) }
+      };
+    }
+  };
+
+  function resetRound() {
+    firefighter = {
+      x: 170,
+      y: FH * 0.58,
+      radius: 34,
+      angle: -0.2,
+      speed: 350
+    };
+    terrain = makeTerrain();
+    fires = makeStartingFires();
+    waterDrops = [];
+    steamPuffs = [];
+    water = 100;
+    state = "ready";
+    spawnTimer = 0;
+    elapsedTime = 0;
+    firesPutOut = 0;
+    combo = 1;
+    comboTimer = 0;
+    bonusText = "Ready";
+    bonusTimer = 0;
+    input.movePointer = null;
+    input.aimPointer = null;
+    input.spraying = false;
+    input.aim = { x: 720, y: 430 };
+    input.keys.clear();
+    game.score = 0;
+    game.done = false;
+    messageTitle = "Fireline Rescue";
+    messageBody = "Move with your left thumb. Aim and spray with your right thumb. Keep putting out fires for the highest score.";
+    messageButton = "Tap to start";
+  }
+
+  function startRound() {
+    state = "playing";
+    hint.textContent = "Left side moves. Right side aims and sprays. Try short sprays to save water.";
+  }
+
+  function toFirePoint(x, y) {
+    return { x: (x / W) * FW, y: (y / H) * FH };
+  }
+
+  function pointerId(event) {
+    return event?.pointerId ?? 1;
+  }
+
+  function makeFire(x, y, size, difficulty, forcedType) {
+    const roll = Math.random();
+    let type = forcedType || "standard";
+    if (!forcedType) {
+      if (difficulty > 1.3 && roll < 0.24) type = "runner";
+      else if (difficulty > 1.8 && roll < 0.48) type = "inferno";
+      else if (difficulty > 2.5 && roll < 0.62) type = "ember";
+    }
+
+    const typeStats = {
+      standard: { health: 1, speed: 1, score: 1, color: "#ff4f24", inner: "#fff26a", label: "" },
+      runner: { health: 0.72, speed: 1.55, score: 1.25, color: "#ff7b2d", inner: "#ffe86a", label: "Fast" },
+      inferno: { health: 1.58, speed: 0.74, score: 1.65, color: "#d93725", inner: "#ffcc3d", label: "Heavy" },
+      ember: { health: 0.5, speed: 1.1, score: 0.9, color: "#ffb02e", inner: "#fff7a0", label: "Ember" }
+    }[type];
+    const speedBoost = Math.min(44, difficulty * 4.2);
+    const healthBoost = Math.min(60, difficulty * 5.5);
+    return {
+      x,
+      y,
+      size,
+      type,
+      typeStats,
+      health: (100 + healthBoost) * size * typeStats.health,
+      maxHealth: (100 + healthBoost) * size * typeStats.health,
+      speed: (23 + speedBoost + Math.random() * (14 + difficulty * 0.8)) * typeStats.speed,
+      bob: Math.random() * Math.PI * 2,
+      hot: 0
+    };
+  }
+
+  function currentDifficulty() {
+    return 1 + elapsedTime / 18 + firesPutOut / 5;
+  }
+
+  function makeStartingFires() {
+    const types = shuffled(["standard", "runner", "inferno"]);
+    const firesToPlace = [];
+    const lanes = shuffled([260, 410, 570, 720]);
+    for (let i = 0; i < 3; i += 1) {
+      const size = rand(0.88, 1.14);
+      firesToPlace.push(makeFire(rand(540 + i * 120, 660 + i * 145), lanes[i], size, 1, types[i]));
+    }
+    return firesToPlace;
+  }
+
+  function makeTerrain() {
+    const blocks = [];
+    const targetCount = 5;
+    const playerClearance = { x: 86, y: 496, w: 235, h: 250 };
+    const exitClearance = { x: FW - 165, y: 80, w: 150, h: FH - 160 };
+
+    for (let attempts = 0; blocks.length < targetCount && attempts < 100; attempts += 1) {
+      const type = Math.random() < 0.56 ? "log" : "rubble";
+      const block = type === "log"
+        ? { x: rand(275, 1090), y: rand(175, FH - 250), w: rand(92, 142), h: 34, type }
+        : { x: rand(420, 1010), y: rand(180, FH - 280), w: rand(76, 108), h: rand(62, 88), type };
+
+      if (rectsOverlap(block, playerClearance, 28)) continue;
+      if (rectsOverlap(block, exitClearance, 12)) continue;
+      if (blocks.some((existing) => rectsOverlap(block, existing, 46))) continue;
+      blocks.push(block);
+    }
+    return blocks;
+  }
+
+  function updateFireline(dt) {
+    if (state !== "playing") return;
+
+    elapsedTime += dt;
+    comboTimer = Math.max(0, comboTimer - dt);
+    bonusTimer = Math.max(0, bonusTimer - dt);
+    if (comboTimer === 0) combo = 1;
+    if (bonusTimer === 0) bonusText = input.spraying ? "Spraying" : "Hold line";
+    award(Math.floor(dt * (4 + currentDifficulty())), "", false);
+    moveFirefighter(dt);
+    firefighter.angle = Math.atan2(input.aim.y - firefighter.y, input.aim.x - firefighter.x);
+
+    if (input.spraying && water > 0) {
+      water = Math.max(0, water - 7.8 * dt);
+      emitWater(dt);
+    }
+
+    for (const drop of waterDrops) {
+      drop.x += drop.vx * dt;
+      drop.y += drop.vy * dt;
+      drop.life -= dt;
+      drop.radius *= 0.997;
+      if (terrain.some((block) => circleRectHit(drop.x, drop.y, drop.radius, block))) {
+        drop.life = 0;
+        steamPuffs.push({ x: drop.x, y: drop.y, radius: 8 + Math.random() * 8, life: 0.22, speed: 25 });
+      }
+    }
+
+    for (const fire of fires) {
+      if (fire.health <= 0) continue;
+      fire.x += fire.speed * dt;
+      fire.y += Math.sin(performance.now() * 0.002 + fire.bob) * 10 * dt;
+      fire.hot = Math.max(0, fire.hot - dt * 2);
+      if (circleCircleHit(fire.x, fire.y, 44 * fire.size, firefighter.x, firefighter.y, firefighter.radius)) {
+        loseGame("Too close", "A fire reached you. Keep distance and use the terrain to control your angle.");
+        return;
+      }
+      if (fire.x + fire.size * 44 > FW - 88) {
+        loseGame("Fire escaped", "A fire reached the red exit. Keep moving and spray sooner next time.");
+        return;
+      }
+    }
+
+    handleWaterHits(dt);
+    waterDrops = waterDrops.filter((drop) => drop.life > 0 && drop.x < FW + 40 && drop.x > -40 && drop.y > -40 && drop.y < FH + 40);
+    steamPuffs.forEach((puff) => {
+      puff.y -= puff.speed * dt;
+      puff.life -= dt;
+      puff.radius += 20 * dt;
+    });
+    steamPuffs = steamPuffs.filter((puff) => puff.life > 0);
+
+    fires = fires.filter((fire) => fire.health > 0);
+    spawnTimer += dt;
+    const difficulty = currentDifficulty();
+    const maxFires = Math.min(8, 3 + Math.floor(difficulty / 1.7));
+    const spawnDelay = Math.max(0.85, 3.35 - difficulty * 0.24);
+    if (fires.length < maxFires && spawnTimer > spawnDelay) {
+      spawnTimer = 0;
+      fires.push(spawnFire(difficulty));
+    }
+
+    if (water <= 0 && waterDrops.length === 0 && fires.length > 0) {
+      loseGame("Out of water", "Try short sprays. The tank ran dry before the fires were out.");
+    }
+  }
+
+  function award(points, label, useCombo = true) {
+    if (points <= 0) return;
+    const earned = useCombo ? Math.round(points * combo) : points;
+    addScore(earned);
+    if (label) {
+      bonusText = "+" + earned + " " + label;
+      bonusTimer = 1.15;
+    }
+  }
+
+  function bumpCombo(label) {
+    combo = Math.min(5, combo + 1);
+    comboTimer = 3.2;
+    bonusText = label;
+    bonusTimer = 1.4;
+  }
+
+  function spawnFire(difficulty) {
+    const size = 0.82 + Math.random() * Math.min(0.58, 0.25 + difficulty * 0.045);
+    const startX = 430 - Math.random() * Math.min(190, difficulty * 18);
+    const y = 170 + Math.random() * (FH - 310);
+    return makeFire(startX, y, size, difficulty);
+  }
+
+  function moveFirefighter(dt) {
+    let dx = 0;
+    let dy = 0;
+
+    if (input.movePointer !== null) {
+      dx = input.moveNow.x - input.moveStart.x;
+      dy = input.moveNow.y - input.moveStart.y;
+      const length = Math.hypot(dx, dy);
+      if (length > 1) {
+        const limit = Math.min(1, length / 92);
+        dx = (dx / length) * limit;
+        dy = (dy / length) * limit;
+      }
+    }
+
+    if (input.keys.has("arrowleft") || input.keys.has("a")) dx -= 1;
+    if (input.keys.has("arrowright") || input.keys.has("d")) dx += 1;
+    if (input.keys.has("arrowup") || input.keys.has("w")) dy -= 1;
+    if (input.keys.has("arrowdown") || input.keys.has("s")) dy += 1;
+
+    const length = Math.hypot(dx, dy);
+    if (length > 1) {
+      dx /= length;
+      dy /= length;
+    }
+
+    const nextX = clamp(firefighter.x + dx * firefighter.speed * dt, 78, FW * 0.58);
+    const nextY = clamp(firefighter.y + dy * firefighter.speed * dt, 170, FH - 112);
+    moveFirefighterTo(nextX, nextY);
+  }
+
+  function moveFirefighterTo(nextX, nextY) {
+    const oldX = firefighter.x;
+    const oldY = firefighter.y;
+
+    firefighter.x = nextX;
+    firefighter.y = nextY;
+    if (!terrain.some((block) => circleRectHit(firefighter.x, firefighter.y, firefighter.radius, block))) return;
+
+    firefighter.x = nextX;
+    firefighter.y = oldY;
+    if (!terrain.some((block) => circleRectHit(firefighter.x, firefighter.y, firefighter.radius, block))) return;
+
+    firefighter.x = oldX;
+    firefighter.y = nextY;
+    if (!terrain.some((block) => circleRectHit(firefighter.x, firefighter.y, firefighter.radius, block))) return;
+
+    firefighter.x = oldX;
+    firefighter.y = oldY;
+  }
+
+  function emitWater(dt) {
+    const nozzle = hoseNozzle();
+    const count = Math.ceil(32 * dt);
+    for (let i = 0; i < count; i += 1) {
+      const spread = (Math.random() - 0.5) * 0.24;
+      const speed = 760 + Math.random() * 120;
+      const angle = firefighter.angle + spread;
+      waterDrops.push({
+        x: nozzle.x + Math.cos(angle) * 8,
+        y: nozzle.y + Math.sin(angle) * 8,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed + 18,
+        radius: 7 + Math.random() * 5,
+        life: 0.74 + Math.random() * 0.25
+      });
+    }
+  }
+
+  function handleWaterHits(dt) {
+    for (const fire of fires) {
+      if (fire.health <= 0) continue;
+      const hitRadius = 54 * fire.size;
+      for (const drop of waterDrops) {
+        if (drop.life <= 0) continue;
+        const distance = Math.hypot(drop.x - fire.x, drop.y - fire.y);
+        if (distance < hitRadius + drop.radius) {
+          drop.life = 0;
+          fire.health -= 52 * dt + 5;
+          fire.hot = 1;
+          award(Math.round(3 * fire.typeStats.score), "hit");
+          steamPuffs.push({
+            x: fire.x + (Math.random() - 0.5) * 38,
+            y: fire.y - 22,
+            radius: 14 + Math.random() * 14,
+            life: 0.42 + Math.random() * 0.22,
+            speed: 50 + Math.random() * 30
+          });
+          if (fire.health <= 0) {
+            firesPutOut += 1;
+            const waterBonus = water > 45 ? 70 : water > 25 ? 35 : 0;
+            const typeBonus = Math.round((120 * fire.size + water * 0.8) * fire.typeStats.score);
+            award(typeBonus, (fire.typeStats.label || "Fire") + " out");
+            if (waterBonus > 0) award(waterBonus, "water save");
+            bumpCombo("combo");
+            water = Math.min(100, water + 7 + Math.max(0, 10 - currentDifficulty()));
+            for (let i = 0; i < 12; i += 1) {
+              steamPuffs.push({
+                x: fire.x + (Math.random() - 0.5) * 70,
+                y: fire.y + (Math.random() - 0.5) * 46,
+                radius: 20 + Math.random() * 24,
+                life: 0.7 + Math.random() * 0.35,
+                speed: 70 + Math.random() * 45
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function loseGame(title, body) {
+    state = "lost";
+    input.spraying = false;
+    messageTitle = title;
+    messageBody = "Final score: " + game.score + ". " + body;
+    messageButton = "Tap Restart";
+    gameOver(title);
+  }
+
+  function drawFireline() {
+    drawFirelineBackground();
+    drawFirelineTerrain();
+    drawExit();
+    drawWater();
+    drawFires();
+    drawFirefighter();
+    drawSteam();
+    drawJoystick();
+    drawHud();
+    if (state !== "playing") drawMessage();
+  }
+
+  function drawFirelineBackground() {
+    ctx.clearRect(0, 0, FW, FH);
+    const gradient = ctx.createLinearGradient(0, 0, FW, FH);
+    gradient.addColorStop(0, "#496848");
+    gradient.addColorStop(0.52, "#394a3d");
+    gradient.addColorStop(1, "#4b3b32");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, FW, FH);
+
+    ctx.fillStyle = "#293329";
+    ctx.fillRect(0, FH - 126, FW, 126);
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    for (let x = -80; x < FW + 100; x += 160) ctx.fillRect(x, FH - 70, 88, 8);
+
+    ctx.fillStyle = "#5f5542";
+    for (let y = 150; y < FH - 160; y += 140) ctx.fillRect(1040, y + 42, 72, 20);
+  }
+
+  function drawFirelineTerrain() {
+    for (const block of terrain) {
+      ctx.save();
+      ctx.translate(block.x, block.y);
+      if (block.type === "log") {
+        ctx.fillStyle = "#684b32";
+        ctx.beginPath();
+        ctx.roundRect(0, 0, block.w, block.h, 12);
+        ctx.fill();
+        ctx.fillStyle = "#8a6745";
+        ctx.fillRect(10, 7, block.w - 20, 5);
+        ctx.fillStyle = "#3d2d23";
+        ctx.beginPath();
+        ctx.arc(14, block.h * 0.5, 10, 0, Math.PI * 2);
+        ctx.arc(block.w - 14, block.h * 0.5, 10, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = "#5f6259";
+        ctx.beginPath();
+        ctx.roundRect(0, 0, block.w, block.h, 10);
+        ctx.fill();
+        ctx.fillStyle = "#80877d";
+        ctx.fillRect(12, 12, block.w * 0.38, 12);
+        ctx.fillRect(block.w * 0.52, block.h * 0.48, block.w * 0.32, 12);
+        ctx.fillStyle = "rgba(20, 18, 15, 0.28)";
+        ctx.fillRect(0, block.h - 10, block.w, 10);
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawExit() {
+    ctx.fillStyle = "rgba(198, 48, 48, 0.25)";
+    ctx.fillRect(FW - 88, 0, 88, FH);
+    ctx.fillStyle = "#ff5f52";
+    ctx.fillRect(FW - 88, 0, 12, FH);
+    ctx.save();
+    ctx.translate(FW - 38, FH * 0.5);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = "#ffe1dc";
+    ctx.font = "800 34px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("EXIT", 0, 12);
+    ctx.restore();
+  }
+
+  function drawFirefighter() {
+    const { x, y, angle } = firefighter;
+    const nozzle = hoseNozzle();
+
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineWidth = 18;
+    ctx.strokeStyle = "#303a35";
+    ctx.beginPath();
+    ctx.moveTo(x, y + 9);
+    ctx.lineTo(nozzle.x, nozzle.y);
+    ctx.stroke();
+
+    ctx.lineWidth = 9;
+    ctx.strokeStyle = "#e7d9a2";
+    ctx.beginPath();
+    ctx.moveTo(x, y + 9);
+    ctx.lineTo(nozzle.x, nozzle.y);
+    ctx.stroke();
+
+    ctx.translate(x, y);
+    ctx.fillStyle = "#24302a";
+    ctx.beginPath();
+    ctx.roundRect(-30, 20, 60, 45, 12);
+    ctx.fill();
+
+    ctx.fillStyle = "#f5c84b";
+    ctx.beginPath();
+    ctx.roundRect(-28, -30, 56, 60, 14);
+    ctx.fill();
+
+    ctx.fillStyle = "#2b3431";
+    ctx.fillRect(-30, -6, 60, 12);
+    ctx.fillStyle = "#fff6c8";
+    ctx.fillRect(-6, -29, 12, 58);
+
+    ctx.fillStyle = "#ffd063";
+    ctx.beginPath();
+    ctx.arc(0, -48, 26, Math.PI, 0);
+    ctx.lineTo(30, -45);
+    ctx.lineTo(-30, -45);
+    ctx.fill();
+    ctx.fillStyle = "#b9342e";
+    ctx.fillRect(-26, -47, 52, 8);
+
+    ctx.rotate(angle);
+    ctx.fillStyle = "#cad9dc";
+    ctx.beginPath();
+    ctx.roundRect(18, -7, 48, 14, 7);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function hoseNozzle() {
+    return {
+      x: firefighter.x + Math.cos(firefighter.angle) * 68,
+      y: firefighter.y + Math.sin(firefighter.angle) * 68
+    };
+  }
+
+  function drawFires() {
+    const now = performance.now();
+    for (const fire of fires) {
+      const pulse = Math.sin(now * 0.011 + fire.bob) * 0.08 + 1;
+      const size = fire.size * pulse * (0.48 + fire.health / fire.maxHealth * 0.62);
+      ctx.save();
+      ctx.translate(fire.x, fire.y);
+
+      ctx.fillStyle = "rgba(20, 18, 15, 0.36)";
+      ctx.beginPath();
+      ctx.ellipse(0, 46 * fire.size, 52 * fire.size, 16 * fire.size, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawFlameShape(0, 0, 52 * size, 88 * size, fire.typeStats.color);
+      drawFlameShape(-8 * size, 6 * size, 36 * size, 68 * size, fire.type === "inferno" ? "#7b201d" : "#ffaf2c");
+      drawFlameShape(7 * size, 17 * size, 22 * size, 43 * size, fire.hot > 0 ? "#c8f8ff" : "#fff26a");
+
+      if (fire.type !== "standard") {
+        ctx.fillStyle = fire.typeStats.inner;
+        ctx.font = "800 " + Math.round(16 * fire.size) + "px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(fire.typeStats.label, 0, 92 * fire.size);
+      }
+
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillRect(-38 * fire.size, 66 * fire.size, 76 * fire.size, 8);
+      ctx.fillStyle = "#84d0ff";
+      ctx.fillRect(-38 * fire.size, 66 * fire.size, 76 * fire.size * clamp(1 - fire.health / fire.maxHealth, 0, 1), 8);
+      ctx.restore();
+    }
+  }
+
+  function drawFlameShape(x, y, width, height, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y - height * 0.55);
+    ctx.bezierCurveTo(x - width * 0.54, y - height * 0.14, x - width * 0.5, y + height * 0.42, x, y + height * 0.5);
+    ctx.bezierCurveTo(x + width * 0.54, y + height * 0.23, x + width * 0.42, y - height * 0.18, x, y - height * 0.55);
+    ctx.fill();
+  }
+
+  function drawWater() {
+    ctx.save();
+    ctx.lineCap = "round";
+    for (const drop of waterDrops) {
+      ctx.globalAlpha = clamp(drop.life / 0.8, 0, 1);
+      ctx.strokeStyle = "#8edaff";
+      ctx.lineWidth = drop.radius;
+      ctx.beginPath();
+      ctx.moveTo(drop.x, drop.y);
+      ctx.lineTo(drop.x - drop.vx * 0.026, drop.y - drop.vy * 0.026);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawSteam() {
+    ctx.save();
+    for (const puff of steamPuffs) {
+      ctx.globalAlpha = clamp(puff.life, 0, 0.55);
+      ctx.fillStyle = "#e4f1ef";
+      ctx.beginPath();
+      ctx.arc(puff.x, puff.y, puff.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawJoystick() {
+    if (state !== "playing" || input.movePointer === null) return;
+    const dx = input.moveNow.x - input.moveStart.x;
+    const dy = input.moveNow.y - input.moveStart.y;
+    const length = Math.hypot(dx, dy);
+    const limit = Math.min(70, length);
+    const knobX = input.moveStart.x + (length ? dx / length : 0) * limit;
+    const knobY = input.moveStart.y + (length ? dy / length : 0) * limit;
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.32)";
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(input.moveStart.x, input.moveStart.y, 82, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,211,94,0.72)";
+    ctx.beginPath();
+    ctx.arc(knobX, knobY, 36, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHud() {
+    const activeFires = fires.filter((fire) => fire.health > 0).length;
+    ctx.save();
+    drawHudBox(18, 18, 190, 126);
+    ctx.fillStyle = "#f8fbf2";
+    ctx.font = "800 18px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("Fireline Rescue", 32, 46);
+    drawHudRow("Score", game.score, 32, 78, 154);
+    ctx.fillStyle = combo > 1 ? "#fff4ad" : "#9de8ff";
+    ctx.font = "800 13px system-ui";
+    ctx.fillText(combo > 1 ? combo + "x " + bonusText : bonusText, 32, 114);
+
+    drawHudBox(FW - 164, 18, 146, 92);
+    drawHudRow("Water", Math.max(0, Math.round(water)) + "%", FW - 150, 52, 118);
+    drawHudRow("Fires", activeFires, FW - 150, 84, 118);
+    ctx.restore();
+  }
+
+  function drawHudBox(x, y, w, h) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.fillStyle = "rgba(18, 25, 22, 0.72)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(248, 251, 242, 0.14)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawHudRow(label, value, x, y, valueOffset) {
+    ctx.fillStyle = "#d8e6d0";
+    ctx.font = "15px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(label, x, y);
+    ctx.fillStyle = "#fff4ad";
+    ctx.font = "800 20px system-ui";
+    ctx.textAlign = "right";
+    ctx.fillText(String(value), x + valueOffset, y);
+  }
+
+  function drawMessage() {
+    ctx.save();
+    ctx.fillStyle = "rgba(13, 18, 16, 0.76)";
+    ctx.fillRect(0, 0, FW, FH);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#f8fbf2";
+    ctx.font = "900 66px ui-rounded, system-ui, sans-serif";
+    ctx.fillText(messageTitle, FW / 2, 390);
+    ctx.fillStyle = "#e7f0df";
+    ctx.font = "24px system-ui";
+    wrapText(messageBody, FW / 2, 442, 620, 34);
+    ctx.beginPath();
+    ctx.roundRect(FW / 2 - 86, 540, 172, 54, 8);
+    ctx.fillStyle = "#ffd35e";
+    ctx.fill();
+    ctx.fillStyle = "#1b211d";
+    ctx.font = "800 18px system-ui";
+    ctx.fillText(messageButton, FW / 2, 574);
+    ctx.restore();
+  }
+
+  function wrapText(text, x, y, maxWidth, lineHeight) {
+    const words = text.split(" ");
+    let line = "";
+    for (const word of words) {
+      const testLine = line ? line + " " + word : word;
+      if (ctx.measureText(testLine).width > maxWidth && line) {
+        ctx.fillText(line, x, y);
+        line = word;
+        y += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x, y);
+  }
+
+  function rectsOverlap(a, b, padding = 0) {
+    return a.x - padding < b.x + b.w &&
+      a.x + a.w + padding > b.x &&
+      a.y - padding < b.y + b.h &&
+      a.y + a.h + padding > b.y;
+  }
+
+  function circleCircleHit(ax, ay, ar, bx, by, br) {
+    return Math.hypot(ax - bx, ay - by) < ar + br;
+  }
+
+  function circleRectHit(cx, cy, radius, rect) {
+    const nearestX = clamp(cx, rect.x, rect.x + rect.w);
+    const nearestY = clamp(cy, rect.y, rect.y + rect.h);
+    return Math.hypot(cx - nearestX, cy - nearestY) < radius;
+  }
+
+  function shuffled(items) {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+
+  function onKeyDown(event) {
+    const key = event.key.toLowerCase();
+    if (!["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d", " "].includes(key)) return;
+    event.preventDefault();
+    if (state !== "playing") startRound();
+    input.keys.add(key);
+    if (event.key === " ") input.spraying = true;
+  }
+
+  function onKeyUp(event) {
+    const key = event.key.toLowerCase();
+    input.keys.delete(key);
+    if (event.key === " ") input.spraying = false;
+  }
+
+  function onMouseUp() {
+    if (input.aimPointer === null) input.spraying = false;
+  }
+
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("mouseup", onMouseUp);
+
+  resetRound();
+  return game;
 }
 
 function createMiniGolf() {

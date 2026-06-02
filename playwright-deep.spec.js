@@ -38,6 +38,18 @@ test("core games have playable interactions", async ({ page }) => {
   await page.waitForTimeout(1800);
   await expect(page.locator("#hint")).not.toContainText(/undefined|NaN/);
   await back();
+
+  await openGame("Fireline Rescue");
+  await clickCanvas(480, 320);
+  const aim = await canvasPoint(820, 320);
+  await page.mouse.move(aim.x, aim.y);
+  await page.mouse.down();
+  await page.waitForTimeout(650);
+  await page.mouse.up();
+  await expect(page.locator("#statTimeLabel")).toHaveText("water");
+  await expect.poll(async () => Number(await page.locator("#statTime").textContent())).toBeLessThan(100);
+  await expect(page.locator("#hint")).not.toContainText(/undefined|NaN/);
+  await back();
 });
 
 test("pet rescue jump returns to normal and spawns reachable treats", async ({ page }) => {
