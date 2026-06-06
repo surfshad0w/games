@@ -19,8 +19,9 @@ const restartBtn = document.querySelector("#restartBtn");
 const backBtn = document.querySelector("#backBtn");
 const surpriseBtn = document.querySelector("#surpriseBtn");
 
-const W = canvas.width;
-const H = canvas.height;
+const W = 960;
+const H = 640;
+let canvasDpr = 1;
 const storageKey = "ara-games-v1";
 const defaultSave = { best: {}, stars: {}, avatar: {} };
 function readSave() {
@@ -121,6 +122,33 @@ const rand = (min, max) => min + Math.random() * (max - min);
 const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+function configureCanvas() {
+  const nextDpr = clamp(window.devicePixelRatio || 1, 1, 3);
+  const targetW = Math.round(W * nextDpr);
+  const targetH = Math.round(H * nextDpr);
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+    canvas.dataset.dpr = String(nextDpr);
+  }
+  canvasDpr = nextDpr;
+  ctx.setTransform(canvasDpr, 0, 0, canvasDpr, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.textRendering = "geometricPrecision";
+}
+
+function resetCanvasState() {
+  ctx.setTransform(canvasDpr, 0, 0, canvasDpr, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+}
+
 function burst(x, y, colors, count = 18, power = 240) {
   for (let i = 0; i < count; i++) {
     const a = rand(0, Math.PI * 2);
@@ -150,11 +178,14 @@ function updateParticles(dt) {
 function drawParticles() {
   particles.forEach((p) => {
     ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = p.r * 1.8;
     ctx.fillStyle = p.color;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fill();
   });
+  ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
 }
 
@@ -165,6 +196,77 @@ function gradientStage(a, b, c) {
   g.addColorStop(1, c);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+}
+
+function radialGlow(x, y, r, inner, outer = "rgba(255,255,255,0)") {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, inner);
+  g.addColorStop(1, outer);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawAtmosphere(colors, drift = 1) {
+  const now = performance.now() * 0.001;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  colors.forEach((color, i) => {
+    const x = ((i * 291 + now * 18 * drift) % (W + 260)) - 130;
+    const y = 110 + ((i * 137) % 390);
+    radialGlow(x, y, 180 + i * 28, color);
+  });
+  ctx.restore();
+}
+
+function drawStarfield(count = 70, speed = 1, warm = "#ffd166") {
+  const now = performance.now();
+  ctx.save();
+  for (let i = 0; i < count; i++) {
+    const depth = 0.35 + (i % 7) * 0.12;
+    const x = (i * 137 + now * 0.018 * speed * depth) % W;
+    const y = (i * 73 + Math.sin(now * 0.0007 + i) * 8) % H;
+    const r = i % 9 === 0 ? 2.2 : 1.2 + depth;
+    ctx.globalAlpha = 0.35 + depth * 0.35;
+    ctx.fillStyle = i % 4 ? "#ffffff" : warm;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSoftHill(x, y, rx, ry, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawSoftPanel(x, y, w, h, r, fill = "rgba(255,255,255,0.18)") {
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.28)";
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 12;
+  roundRect(x, y, w, h, r, fill);
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, "rgba(255,255,255,0.24)");
+  g.addColorStop(0.48, "rgba(255,255,255,0.06)");
+  g.addColorStop(1, "rgba(0,0,0,0.1)");
+  roundRect(x + 3, y + 3, w - 6, h - 6, Math.max(8, r - 3), g);
+  ctx.restore();
+}
+
+function drawSpriteWithGlow(sheet, rect, x, y, w, h, glow = "rgba(255,255,255,0.35)", blur = 20) {
+  ctx.save();
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = blur;
+  const drew = drawSprite(sheet, rect, x, y, w, h);
+  ctx.restore();
+  return drew;
 }
 
 function saveGame() {
@@ -281,23 +383,34 @@ function glossyRect(x, y, w, h, r, fill, shine = true) {
 
 function stagePattern(color = "rgba(255,255,255,0.12)", size = 76) {
   ctx.save();
+  ctx.globalCompositeOperation = "screen";
   ctx.fillStyle = color;
   for (let x = -size; x < W + size; x += size) {
     for (let y = -size; y < H + size; y += size) {
       const phase = (x + y + performance.now() / 18) % (size * 2);
-      if (phase < size) roundRect(x + 10, y + 10, size * 0.38, 8, 5, color);
+      if (phase < size) {
+        ctx.globalAlpha = 0.32;
+        ctx.beginPath();
+        ctx.arc(x + size * 0.22, y + size * 0.25, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.2;
+        roundRect(x + size * 0.45, y + size * 0.58, size * 0.26, 4, 4, color);
+      }
     }
   }
   ctx.restore();
 }
 
 function drawTopHud(label, accent = "#fff") {
-  glossyRect(28, 24, 904, 58, 22, "rgba(255,255,255,0.18)", false);
+  drawSoftPanel(28, 24, 904, 58, 22, "rgba(255,255,255,0.18)");
   textCenter(label, W / 2, 53, 28, "#fff");
   ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 12;
   ctx.beginPath();
   ctx.roundRect(50, 42, 110, 14, 7);
   ctx.fill();
+  ctx.shadowBlur = 0;
 }
 
 function drawAsset(name, x, y, w, h) {
@@ -426,6 +539,8 @@ function loop(t) {
   const dt = Math.min(0.033, (t - lastTime) / 1000 || 0.016);
   lastTime = t;
   if (activeGame) {
+    configureCanvas();
+    resetCanvasState();
     updateParticles(dt);
     if (!activeGame.done) {
       activeGame.time = Math.max(0, (activeGame.time || 0) - dt);
@@ -490,12 +605,12 @@ const palettes = {
 };
 
 const gameDefs = [
-  { id: "gem-pop", title: "Gem Pop Arcade", kicker: "Tap the matching gems", icon: "💎", color: "linear-gradient(145deg, #ff6b6b, #f083ff)", desc: "Pop color groups before time runs out.", hint: "Tap big groups of matching gems. Bigger groups make bigger points.", starEvery: 120, create: createGemPop },
-  { id: "pet-rescue", title: "Pet Rescue Run", kicker: "Jump and collect", icon: "🐶", color: "linear-gradient(145deg, #37d99e, #54c6eb)", desc: "Run, jump, grab treats, and rescue pets.", hint: "Use Jump to hop over puddles and collect treats.", starEvery: 80, controls: [{ id: "jump", label: "Jump" }], create: createPetRescue },
-  { id: "space-miner", title: "Space Miner", kicker: "Fly and dodge", icon: "🚀", color: "linear-gradient(145deg, #315c9d, #8bd3ff)", desc: "Collect crystals while avoiding asteroids.", hint: "Drag anywhere to steer the ship.", starEvery: 100, create: createSpaceMiner },
-  { id: "fireline-rescue", title: "Fireline Rescue", kicker: "Spray and survive", icon: "🚒", color: "linear-gradient(145deg, #20362f, #ff6b3d)", desc: "Move, aim, and put out wildfires before they escape.", hint: "Tap the canvas to start. Left side moves, right side aims and sprays. Keyboard: WASD or arrows plus Space.", starEvery: 260, create: createFirelineRescue },
-  { id: "mini-golf", title: "Mini Golf Madness", kicker: "Aim and putt", icon: "⛳", color: "linear-gradient(145deg, #2cb67d, #ffd166)", desc: "Bounce around bumpers and sink putts.", hint: "Drag back from the ball, then let go to shoot.", starEvery: 55, create: createMiniGolf },
-  { id: "rainbow-art", title: "Rainbow Art Studio", kicker: "Paint and sticker", icon: "🖍️", color: "linear-gradient(145deg, #ff5c8a, #37d99e)", desc: "Make bright scenes with brushes and stickers.", hint: "Pick a tool, then draw or stamp on the canvas. Finish the prompt for bonus stars.", starEvery: 70, create: createRainbowArtStudio }
+  { id: "gem-pop", title: "Gem Pop Arcade", kicker: "Tap the matching gems", icon: "💎", thumb: "assets/generated/gem-pop-sprites.png", color: "linear-gradient(145deg, #9b2cff, #ff5f8e 55%, #ffd166)", desc: "Pop color groups before time runs out.", hint: "Tap big groups of matching gems. Bigger groups make bigger points.", starEvery: 120, create: createGemPop },
+  { id: "pet-rescue", title: "Pet Rescue Run", kicker: "Jump and collect", icon: "🐶", thumb: "assets/generated/pet-rescue-sprites.png", color: "linear-gradient(145deg, #0f9f7a, #54c6eb 58%, #ffd166)", desc: "Run, jump, grab treats, and rescue pets.", hint: "Use Jump to hop over puddles and collect treats.", starEvery: 80, controls: [{ id: "jump", label: "Jump" }], create: createPetRescue },
+  { id: "space-miner", title: "Space Miner", kicker: "Fly and dodge", icon: "🚀", thumb: "assets/generated/space-miner-sprites.png", color: "linear-gradient(145deg, #111642, #3d5cff 52%, #9b5cff)", desc: "Collect crystals while avoiding asteroids.", hint: "Drag anywhere to steer the ship.", starEvery: 100, create: createSpaceMiner },
+  { id: "fireline-rescue", title: "Fireline Rescue", kicker: "Spray and survive", icon: "🚒", thumb: "assets/generated/hub-backdrop.png", color: "linear-gradient(145deg, #24352c, #d9482e 62%, #ffd35e)", desc: "Move, aim, and put out wildfires before they escape.", hint: "Tap the canvas to start. Left side moves, right side aims and sprays. Keyboard: WASD or arrows plus Space.", starEvery: 260, create: createFirelineRescue },
+  { id: "mini-golf", title: "Mini Golf Madness", kicker: "Aim and putt", icon: "⛳", thumb: "assets/generated/mini-golf-sprites.png", color: "linear-gradient(145deg, #0f9f6e, #37d99e 52%, #ffd166)", desc: "Bounce around bumpers and sink putts.", hint: "Drag back from the ball, then let go to shoot.", starEvery: 55, create: createMiniGolf },
+  { id: "rainbow-art", title: "Rainbow Art Studio", kicker: "Paint and sticker", icon: "🖍️", thumb: "assets/generated/new-games/rainbow-art-studio.png", color: "linear-gradient(145deg, #ff5c8a, #54c6eb 54%, #37d99e)", desc: "Make bright scenes with brushes and stickers.", hint: "Pick a tool, then draw or stamp on the canvas. Finish the prompt for bonus stars.", starEvery: 70, create: createRainbowArtStudio }
 ];
 
 const games = Object.fromEntries(gameDefs.map((g) => [g.id, g]));
@@ -507,7 +622,7 @@ function renderCards() {
     card.type = "button";
     card.className = "game-card";
     card.style.setProperty("--card-bg", game.color);
-    card.innerHTML = '<span class="icon">' + game.icon + '</span><h3>' + game.title + '</h3><p>' + game.desc + '</p><span class="best">Best ' + (save.best[game.id] || 0) + '</span>';
+    card.innerHTML = '<span class="preview"><img class="preview-art" src="' + game.thumb + '" alt=""><span class="icon">' + game.icon + '</span></span><h3>' + game.title + '</h3><p>' + game.desc + '</p><span class="best">Best ' + (save.best[game.id] || 0) + '</span>';
     card.addEventListener("click", () => startGame(game.id));
     grid.append(card);
   });
@@ -605,17 +720,20 @@ function createGemPop() {
     },
     draw() {
       gradientStage("#4019a9", "#db2f8f", "#ffbd48");
+      drawAtmosphere(["rgba(255,246,109,0.22)", "rgba(84,198,235,0.16)", "rgba(240,131,255,0.18)"], 0.65);
       stagePattern("rgba(255,255,255,0.16)", 86);
       drawTopHud("Level " + level + "  •  " + levelScore + "/" + target + "  •  " + moves + " moves", "#fff66d");
-      glossyRect(178, 100, 604, 500, 34, "rgba(255,255,255,0.15)", false);
+      drawSoftPanel(172, 96, 616, 508, 36, "rgba(255,255,255,0.16)");
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         const x = ox + c * cell + 8, y = oy + r * cell + 8;
+        const gemX = x + (cell - 16) / 2;
+        const gemY = y + (cell - 16) / 2;
         ctx.shadowColor = "rgba(0,0,0,0.25)";
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 14;
         ctx.shadowOffsetY = 6;
         ctx.fillStyle = "rgba(255,255,255,0.18)";
         ctx.beginPath(); ctx.roundRect(x - 3, y + 4, cell - 10, cell - 10, 18); ctx.fill();
-        if (!drawSprite("gemSheet", sprites.gems[board[r][c]], x + (cell - 16) / 2, y + (cell - 16) / 2, cell - 10, cell - 12)) {
+        if (!drawSpriteWithGlow("gemSheet", sprites.gems[board[r][c]], gemX, gemY, cell - 10, cell - 12, colors[board[r][c]], 18)) {
           glossyRect(x, y, cell - 16, cell - 16, 18, colors[board[r][c]]);
         }
         ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
@@ -628,6 +746,7 @@ function createGemPop() {
       }
       pops.forEach((p) => {
         ctx.globalAlpha = clamp(p.t / 0.25, 0, 1);
+        radialGlow(p.x, p.y, 62, "rgba(255,255,255,0.28)");
         if (!drawSprite("gemSheet", sprites.gemBurst, p.x, p.y, 70, 48)) {
           ctx.strokeStyle = "#fff";
           ctx.lineWidth = 5;
@@ -717,35 +836,52 @@ function createPetRescue() {
     },
     draw() {
       gradientStage("#6ee7ff", "#9cf67f", "#ffd166");
-      stagePattern("rgba(255,255,255,0.14)", 96);
+      drawAtmosphere(["rgba(255,255,255,0.22)", "rgba(255,209,102,0.18)", "rgba(84,198,235,0.12)"], 0.9);
+      stagePattern("rgba(255,255,255,0.12)", 96);
       drawTopHud("Hearts " + "♥".repeat(Math.max(0, health)) + "  •  jumps " + jumps, "#37d99e");
-      ctx.fillStyle = "rgba(255,255,255,0.34)";
-      ctx.beginPath(); ctx.arc(820, 112, 54, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(40,150,95,0.22)";
-      ctx.beginPath(); ctx.ellipse(230, 500, 310, 105, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(720, 500, 340, 120, 0, 0, Math.PI * 2); ctx.fill();
+      radialGlow(820, 112, 96, "rgba(255,255,255,0.46)", "rgba(255,255,255,0)");
+      drawSoftHill(230, 500, 310, 105, "rgba(40,150,95,0.22)");
+      drawSoftHill(720, 500, 340, 120, "rgba(40,150,95,0.24)");
       for (let i = 0; i < 7; i++) {
         const x = (i * 165 - (performance.now() / 24) % 165) + 10;
-        if (!drawSprite("petSheet", sprites.pet.tree, x + 12, 462, 96, 120) && !drawAsset("tree", x + 12, 462, 86, 112)) {
+        if (!drawSpriteWithGlow("petSheet", sprites.pet.tree, x + 12, 462, 96, 120, "rgba(72,190,110,0.2)", 12) && !drawAsset("tree", x + 12, 462, 86, 112)) {
           glossyRect(x, 470, 22, 70, 8, "#a65f3a", false);
           ctx.fillStyle = "#1fbf78";
           ctx.beginPath(); ctx.arc(x + 10, 450, 34, 0, Math.PI * 2); ctx.fill();
         }
       }
       for (let i = 0; i < 6; i++) roundRect(i * 190 - ((performance.now() / 18) % 190), 400 + (i % 2) * 34, 130, 24, 12, "rgba(255,255,255,0.22)");
-      glossyRect(0, 516, W, 124, 0, "#28c77b", false);
-      roundRect(0, 538, W, 20, 0, "rgba(255,255,255,0.22)");
+      const grass = ctx.createLinearGradient(0, 516, 0, H);
+      grass.addColorStop(0, "#37d99e");
+      grass.addColorStop(0.5, "#22b978");
+      grass.addColorStop(1, "#167a51");
+      roundRect(0, 516, W, 124, 0, grass);
+      roundRect(0, 538, W, 18, 0, "rgba(255,255,255,0.24)");
+      for (let i = 0; i < 24; i++) {
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const gx = (i * 43 - performance.now() / 45) % W;
+        ctx.moveTo(gx, 584);
+        ctx.lineTo(gx + 15, 548);
+        ctx.stroke();
+      }
       for (let i = 0; i < 8; i++) {
         const cx = (i * 170 + (performance.now() / 30) % 170) - 60;
         const cy = 90 + (i % 3) * 38;
-        if (!drawSprite("petSheet", sprites.pet.cloud, cx, cy, 126, 70) && !drawAsset("cloud", cx, cy, 112, 62)) {
+        if (!drawSpriteWithGlow("petSheet", sprites.pet.cloud, cx, cy, 126, 70, "rgba(255,255,255,0.2)", 14) && !drawAsset("cloud", cx, cy, 112, 62)) {
           ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.beginPath(); ctx.arc(cx, cy, 28, 0, Math.PI * 2); ctx.fill();
         }
       }
-      treats.forEach((t) => { if (!drawSprite("petSheet", sprites.pet.star, t.x, t.y, 50, 46) && !drawAsset("starTreat", t.x, t.y, 46, 46)) textCenter("★", t.x, t.y, 34, "#ffd166"); });
-      obstacles.forEach((o) => { if (!drawSprite("petSheet", sprites.pet.puddle, o.x + o.w / 2, o.y + o.h / 2, 94, 54) && !drawAsset("puddle", o.x + o.w / 2, o.y + o.h / 2, 86, 54)) { glossyRect(o.x, o.y, o.w, o.h, 18, "#4f79b8"); ctx.fillStyle = "#8bd3ff"; ctx.fillRect(o.x + 10, o.y + 8, o.w - 20, 8); } });
+      treats.forEach((t) => { if (!drawSpriteWithGlow("petSheet", sprites.pet.star, t.x, t.y, 50, 46, "#ffd166", 18) && !drawAsset("starTreat", t.x, t.y, 46, 46)) textCenter("★", t.x, t.y, 34, "#ffd166"); });
+      obstacles.forEach((o) => { if (!drawSpriteWithGlow("petSheet", sprites.pet.puddle, o.x + o.w / 2, o.y + o.h / 2, 94, 54, "rgba(84,198,235,0.35)", 12) && !drawAsset("puddle", o.x + o.w / 2, o.y + o.h / 2, 86, 54)) { glossyRect(o.x, o.y, o.w, o.h, 18, "#4f79b8"); ctx.fillStyle = "#8bd3ff"; ctx.fillRect(o.x + 10, o.y + 8, o.w - 20, 8); } });
       ctx.globalAlpha = hurtFlash > 0 ? 0.58 + Math.sin(performance.now() / 45) * 0.25 : 1;
-      if (!drawSprite("petSheet", sprites.pet.puppy, player.x, player.y - 7, 104, 88) && !drawAsset("puppy", player.x, player.y - 4, 90, 90)) textCenter("🐶", player.x, player.y, 70, "#fff");
+      const squash = player.grounded ? 1 : 0.96;
+      ctx.save();
+      ctx.translate(player.x, player.y - 7);
+      ctx.scale(1 / squash, squash);
+      if (!drawSpriteWithGlow("petSheet", sprites.pet.puppy, 0, 0, 104, 88, "rgba(255,255,255,0.25)", 12) && !drawAsset("puppy", 0, 3, 90, 90)) textCenter("🐶", 0, 7, 70, "#fff");
+      ctx.restore();
       ctx.globalAlpha = 1;
       drawParticles();
       if (this.done) drawEndOverlay("Rescue done", "Final score " + this.score);
@@ -794,26 +930,25 @@ function createSpaceMiner() {
     },
     draw() {
       gradientStage("#111642", "#2035a6", "#9b5cff");
+      drawAtmosphere(["rgba(84,198,235,0.14)", "rgba(240,131,255,0.18)", "rgba(55,217,158,0.1)"], 0.45);
+      drawStarfield(92, 1.15, "#ffd166");
       drawTopHud("Shields " + "♥".repeat(Math.max(0, health)) + "  •  difficulty " + Math.floor(1 + elapsed / 20), "#8bd3ff");
-      if (!drawSprite("spaceSheet", sprites.space.planet, 755, 145, 210, 130)) {
+      if (!drawSpriteWithGlow("spaceSheet", sprites.space.planet, 755, 145, 210, 130, "rgba(255,209,102,0.22)", 24)) {
         ctx.fillStyle = "rgba(255,209,102,0.3)";
         ctx.beginPath(); ctx.arc(755, 145, 72, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = "rgba(255,255,255,0.26)";
         ctx.lineWidth = 8;
         ctx.beginPath(); ctx.ellipse(755, 145, 112, 26, -0.28, 0, Math.PI * 2); ctx.stroke();
       }
-      ctx.fillStyle = "rgba(55,217,158,0.18)";
-      ctx.beginPath(); ctx.arc(130, 535, 88, 0, Math.PI * 2); ctx.fill();
-      for (let i = 0; i < 70; i++) { ctx.fillStyle = i % 4 ? "rgba(255,255,255,0.45)" : "#ffd166"; ctx.fillRect((i * 137 + performance.now() / 18) % W, (i * 73) % H, 3, 3); }
+      radialGlow(130, 535, 140, "rgba(55,217,158,0.2)", "rgba(55,217,158,0)");
       crystals.forEach((c, i) => {
-        ctx.shadowColor = "#37d99e"; ctx.shadowBlur = 18;
-        if (!drawSprite("spaceSheet", sprites.space.crystals[i % sprites.space.crystals.length], c.x, c.y, 48, 56)) textCenter("◆", c.x, c.y, 46, "#37d99e");
-        ctx.shadowBlur = 0;
+        if (!drawSpriteWithGlow("spaceSheet", sprites.space.crystals[i % sprites.space.crystals.length], c.x, c.y, 48, 56, "#37d99e", 24)) textCenter("◆", c.x, c.y, 46, "#37d99e");
       });
-      rocks.forEach((r, i) => { if (r.x < W - r.r * 1.15 && !drawSprite("spaceSheet", sprites.space.asteroids[i % sprites.space.asteroids.length], r.x, r.y, r.r * 2.15, r.r * 1.45)) drawAsteroid(r.x, r.y, r.r); });
+      rocks.forEach((r, i) => { if (r.x < W - r.r * 1.15 && !drawSpriteWithGlow("spaceSheet", sprites.space.asteroids[i % sprites.space.asteroids.length], r.x, r.y, r.r * 2.15, r.r * 1.45, "rgba(255,255,255,0.12)", 10)) drawAsteroid(r.x, r.y, r.r); });
       ctx.globalAlpha = invulnerable > 0 ? 0.55 + Math.sin(performance.now() / 55) * 0.28 : 1;
-      if (drawSprite("spaceSheet", sprites.space.trail, ship.x - 56, ship.y + 2, 92, 44)) ctx.globalAlpha = invulnerable > 0 ? 0.72 : 1;
-      if (!drawSprite("spaceSheet", sprites.space.rocket, ship.x, ship.y, 104, 58)) textCenter("🚀", ship.x, ship.y, 70);
+      radialGlow(ship.x - 36, ship.y, 84, "rgba(255,209,102,0.22)", "rgba(255,209,102,0)");
+      if (drawSpriteWithGlow("spaceSheet", sprites.space.trail, ship.x - 56, ship.y + 2, 92, 44, "rgba(84,198,235,0.45)", 20)) ctx.globalAlpha = invulnerable > 0 ? 0.72 : 1;
+      if (!drawSpriteWithGlow("spaceSheet", sprites.space.rocket, ship.x, ship.y, 104, 58, "rgba(255,255,255,0.28)", 16)) textCenter("🚀", ship.x, ship.y, 70);
       ctx.globalAlpha = 1;
       drawParticles();
     }
@@ -1259,30 +1394,63 @@ function createFirelineRescue() {
   function drawFirelineBackground() {
     ctx.clearRect(0, 0, FW, FH);
     const gradient = ctx.createLinearGradient(0, 0, FW, FH);
-    gradient.addColorStop(0, "#496848");
-    gradient.addColorStop(0.52, "#394a3d");
-    gradient.addColorStop(1, "#4b3b32");
+    gradient.addColorStop(0, "#6f8b55");
+    gradient.addColorStop(0.5, "#465b3f");
+    gradient.addColorStop(1, "#3d302a");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, FW, FH);
 
-    ctx.fillStyle = "#293329";
-    ctx.fillRect(0, FH - 126, FW, 126);
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    for (let x = -80; x < FW + 100; x += 160) ctx.fillRect(x, FH - 70, 88, 8);
+    ctx.globalCompositeOperation = "screen";
+    const haze = ctx.createRadialGradient(320, 130, 40, 320, 130, 540);
+    haze.addColorStop(0, "rgba(255,220,135,0.24)");
+    haze.addColorStop(1, "rgba(255,220,135,0)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, FW, FH);
+    ctx.globalCompositeOperation = "source-over";
 
-    ctx.fillStyle = "#5f5542";
-    for (let y = 150; y < FH - 160; y += 140) ctx.fillRect(1040, y + 42, 72, 20);
+    ctx.fillStyle = "#243029";
+    ctx.fillRect(0, FH - 126, FW, 126);
+    ctx.fillStyle = "rgba(255,255,255,0.09)";
+    for (let x = -80; x < FW + 100; x += 160) {
+      ctx.beginPath();
+      ctx.roundRect(x, FH - 74, 88, 8, 4);
+      ctx.fill();
+    }
+
+    for (let y = 150; y < FH - 160; y += 140) {
+      ctx.fillStyle = "rgba(95,85,66,0.72)";
+      ctx.beginPath();
+      ctx.roundRect(1040, y + 42, 72, 20, 8);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      ctx.fillRect(1052, y + 48, 42, 4);
+    }
+    for (let i = 0; i < 22; i += 1) {
+      const x = (i * 73 + performance.now() * 0.012) % FW;
+      const y = 120 + (i * 97) % 720;
+      ctx.fillStyle = "rgba(255,185,92,0.08)";
+      ctx.beginPath();
+      ctx.arc(x, y, 3 + (i % 4), 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function drawFirelineTerrain() {
     for (const block of terrain) {
       ctx.save();
       ctx.translate(block.x, block.y);
+      ctx.shadowColor = "rgba(0,0,0,0.26)";
+      ctx.shadowBlur = 16;
+      ctx.shadowOffsetY = 8;
       if (block.type === "log") {
-        ctx.fillStyle = "#684b32";
+        const log = ctx.createLinearGradient(0, 0, 0, block.h);
+        log.addColorStop(0, "#9c7046");
+        log.addColorStop(1, "#4e3526");
+        ctx.fillStyle = log;
         ctx.beginPath();
         ctx.roundRect(0, 0, block.w, block.h, 12);
         ctx.fill();
+        ctx.shadowBlur = 0;
         ctx.fillStyle = "#8a6745";
         ctx.fillRect(10, 7, block.w - 20, 5);
         ctx.fillStyle = "#3d2d23";
@@ -1291,10 +1459,14 @@ function createFirelineRescue() {
         ctx.arc(block.w - 14, block.h * 0.5, 10, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        ctx.fillStyle = "#5f6259";
+        const rock = ctx.createLinearGradient(0, 0, block.w, block.h);
+        rock.addColorStop(0, "#8b9084");
+        rock.addColorStop(1, "#4b4f48");
+        ctx.fillStyle = rock;
         ctx.beginPath();
         ctx.roundRect(0, 0, block.w, block.h, 10);
         ctx.fill();
+        ctx.shadowBlur = 0;
         ctx.fillStyle = "#80877d";
         ctx.fillRect(12, 12, block.w * 0.38, 12);
         ctx.fillRect(block.w * 0.52, block.h * 0.48, block.w * 0.32, 12);
@@ -1325,6 +1497,10 @@ function createFirelineRescue() {
     const nozzle = hoseNozzle();
 
     ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.ellipse(x, y + 64, 48, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.lineCap = "round";
     ctx.lineWidth = 18;
     ctx.strokeStyle = "#303a35";
@@ -1341,11 +1517,16 @@ function createFirelineRescue() {
     ctx.stroke();
 
     ctx.translate(x, y);
+    ctx.shadowColor = "rgba(0,0,0,0.28)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 8;
     ctx.fillStyle = "#24302a";
     ctx.beginPath();
     ctx.roundRect(-30, 20, 60, 45, 12);
     ctx.fill();
 
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
     ctx.fillStyle = "#f5c84b";
     ctx.beginPath();
     ctx.roundRect(-28, -30, 56, 60, 14);
@@ -1387,6 +1568,15 @@ function createFirelineRescue() {
       const size = fire.size * pulse * (0.48 + fire.health / fire.maxHealth * 0.62);
       ctx.save();
       ctx.translate(fire.x, fire.y);
+      ctx.globalCompositeOperation = "screen";
+      const heat = ctx.createRadialGradient(0, 0, 0, 0, 12 * fire.size, 92 * fire.size);
+      heat.addColorStop(0, "rgba(255,177,45,0.5)");
+      heat.addColorStop(1, "rgba(255,79,36,0)");
+      ctx.fillStyle = heat;
+      ctx.beginPath();
+      ctx.arc(0, 8 * fire.size, 92 * fire.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
 
       ctx.fillStyle = "rgba(20, 18, 15, 0.36)";
       ctx.beginPath();
@@ -1426,6 +1616,8 @@ function createFirelineRescue() {
     ctx.lineCap = "round";
     for (const drop of waterDrops) {
       ctx.globalAlpha = clamp(drop.life / 0.8, 0, 1);
+      ctx.shadowColor = "#8edaff";
+      ctx.shadowBlur = drop.radius * 1.4;
       ctx.strokeStyle = "#8edaff";
       ctx.lineWidth = drop.radius;
       ctx.beginPath();
@@ -1433,14 +1625,18 @@ function createFirelineRescue() {
       ctx.lineTo(drop.x - drop.vx * 0.026, drop.y - drop.vy * 0.026);
       ctx.stroke();
     }
+    ctx.shadowBlur = 0;
     ctx.restore();
   }
 
   function drawSteam() {
     ctx.save();
     for (const puff of steamPuffs) {
-      ctx.globalAlpha = clamp(puff.life, 0, 0.55);
-      ctx.fillStyle = "#e4f1ef";
+      ctx.globalAlpha = clamp(puff.life, 0, 0.45);
+      const steam = ctx.createRadialGradient(puff.x, puff.y, 0, puff.x, puff.y, puff.radius);
+      steam.addColorStop(0, "#f4ffff");
+      steam.addColorStop(1, "rgba(244,255,255,0)");
+      ctx.fillStyle = steam;
       ctx.beginPath();
       ctx.arc(puff.x, puff.y, puff.radius, 0, Math.PI * 2);
       ctx.fill();
@@ -1492,13 +1688,19 @@ function createFirelineRescue() {
   }
 
   function drawHudBox(x, y, w, h) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.28)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 8;
     ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 8);
-    ctx.fillStyle = "rgba(18, 25, 22, 0.72)";
+    ctx.roundRect(x, y, w, h, 14);
+    ctx.fillStyle = "rgba(18, 25, 22, 0.68)";
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.strokeStyle = "rgba(248, 251, 242, 0.14)";
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.restore();
   }
 
   function drawHudRow(label, value, x, y, valueOffset) {
@@ -1622,17 +1824,50 @@ function createMiniGolf() {
     },
     draw() {
       gradientStage("#87f79d", "#2cb67d", "#2b9fdd");
-      stagePattern("rgba(255,255,255,0.13)", 98);
+      drawAtmosphere(["rgba(255,209,102,0.16)", "rgba(255,255,255,0.18)", "rgba(84,198,235,0.12)"], 0.55);
+      stagePattern("rgba(255,255,255,0.1)", 98);
       drawTopHud("Drag back, release to putt", "#ffd166");
-      glossyRect(26, 92, W - 52, H - 118, 34, "rgba(255,255,255,0.22)", false);
-      for (let i = 0; i < 9; i++) roundRect(80 + i * 95, 70 + (i % 3) * 140, 44, 12, 8, "rgba(255,255,255,0.2)");
+      drawSoftPanel(26, 92, W - 52, H - 118, 34, "rgba(255,255,255,0.2)");
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(38, 104, W - 76, H - 142, 28);
+      ctx.clip();
+      for (let i = 0; i < 48; i++) {
+        ctx.strokeStyle = i % 2 ? "rgba(255,255,255,0.09)" : "rgba(20,90,60,0.08)";
+        ctx.lineWidth = 2;
+        const x = i * 28 - 30;
+        ctx.beginPath();
+        ctx.moveTo(x, 104);
+        ctx.bezierCurveTo(x + 50, 230, x - 25, 380, x + 38, 614);
+        ctx.stroke();
+      }
+      ctx.restore();
+      for (let i = 0; i < 9; i++) roundRect(80 + i * 95, 70 + (i % 3) * 140, 44, 12, 8, "rgba(255,255,255,0.18)");
       ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 18;
-      if (!drawSprite("golfSheet", sprites.golf.cup, hole.x, hole.y - 22, 82, 92)) { ctx.fillStyle = "#132017"; ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill(); }
+      radialGlow(hole.x, hole.y, 72, "rgba(0,0,0,0.18)", "rgba(0,0,0,0)");
+      if (!drawSpriteWithGlow("golfSheet", sprites.golf.cup, hole.x, hole.y - 22, 82, 92, "rgba(255,255,255,0.18)", 14)) { ctx.fillStyle = "#132017"; ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill(); }
       ctx.shadowBlur = 0;
-      bumpers.forEach((b) => { ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 16; ctx.fillStyle = "#ffd166"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; textCenter("★", b.x, b.y, 28, "#9a5a00"); });
-      if (aiming) { if (!drawSprite("golfSheet", sprites.golf.arrow, (ball.x + aim.x) / 2, (ball.y + aim.y) / 2, 92, 68)) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(aim.x, aim.y); ctx.stroke(); } }
+      bumpers.forEach((b, i) => {
+        if (!drawSpriteWithGlow("golfSheet", sprites.golf.bumpers[i % sprites.golf.bumpers.length], b.x, b.y, b.r * 2.2, b.r * 1.7, "rgba(255,209,102,0.28)", 14)) {
+          ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 16; ctx.fillStyle = "#ffd166"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; textCenter("★", b.x, b.y, 28, "#9a5a00");
+        }
+      });
+      if (aiming) {
+        ctx.save();
+        ctx.globalAlpha = 0.72;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 5;
+        ctx.setLineDash([12, 12]);
+        ctx.beginPath();
+        ctx.moveTo(ball.x, ball.y);
+        ctx.lineTo(aim.x, aim.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        if (!drawSpriteWithGlow("golfSheet", sprites.golf.arrow, (ball.x + aim.x) / 2, (ball.y + aim.y) / 2, 92, 68, "rgba(255,255,255,0.28)", 16)) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(aim.x, aim.y); ctx.stroke(); }
+      }
       ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 8;
-      if (!drawSprite("golfSheet", sprites.golf.ball, ball.x, ball.y, 42, 42)) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill(); }
+      if (!drawSpriteWithGlow("golfSheet", sprites.golf.ball, ball.x, ball.y, 42, 42, "rgba(255,255,255,0.35)", 10)) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill(); }
       ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
       drawParticles();
     }
@@ -1727,19 +1962,23 @@ function createRainbowArtStudio() {
     },
     draw() {
       gradientStage("#ff8fcf", "#54c6eb", "#37d99e");
-      stagePattern("rgba(255,255,255,0.16)", 82);
+      drawAtmosphere(["rgba(255,246,109,0.2)", "rgba(240,131,255,0.2)", "rgba(55,217,158,0.16)"], 0.7);
+      stagePattern("rgba(255,255,255,0.13)", 82);
       drawTopHud("Prompt: add 3 stickers and some color", "#f083ff");
       tools.forEach((t, i) => {
         const x = 64 + i * 118;
-        glossyRect(x, 84, 102, 50, 16, tool === t.id ? "#fff66d" : "rgba(255,255,255,0.24)");
-        if (!drawSprite("rainbowArtSheet", sprites.rainbowArt[t.sprite], x + 51, 109, 42, 36)) textCenter(t.icon, x + 51, 109, 25, "#18233f");
+        drawSoftPanel(x, 84, 102, 50, 16, tool === t.id ? "rgba(255,246,109,0.88)" : "rgba(255,255,255,0.22)");
+        if (!drawSpriteWithGlow("rainbowArtSheet", sprites.rainbowArt[t.sprite], x + 51, 109, 42, 36, "rgba(255,255,255,0.25)", 10)) textCenter(t.icon, x + 51, 109, 25, "#18233f");
       });
       colors.forEach((c, i) => {
+        ctx.shadowColor = c;
+        ctx.shadowBlur = c === color ? 14 : 0;
         ctx.fillStyle = c;
         ctx.beginPath(); ctx.roundRect(670 + i * 38, 96, 32, 32, 10); ctx.fill();
         if (c === color) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.stroke(); }
+        ctx.shadowBlur = 0;
       });
-      glossyRect(area.x - 10, area.y - 10, area.w + 20, area.h + 20, 28, "rgba(255,255,255,0.36)", false);
+      drawSoftPanel(area.x - 10, area.y - 10, area.w + 20, area.h + 20, 28, "rgba(255,255,255,0.34)");
       roundRect(area.x, area.y, area.w, area.h, 22, bg);
       ctx.save();
       ctx.beginPath(); ctx.rect(area.x, area.y, area.w, area.h); ctx.clip();
@@ -1749,17 +1988,22 @@ function createRainbowArtStudio() {
       }
       marks.forEach((m, i) => {
         if (m.type === "dot") {
+          ctx.globalAlpha = 0.92;
+          ctx.shadowColor = m.color;
+          ctx.shadowBlur = 10;
           ctx.fillStyle = m.color;
           ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
         } else if (m.type === "sticker") {
           const lift = bounce > 0 ? Math.sin(performance.now() / 60 + i) * 8 : 0;
-          if (!drawSprite("rainbowArtSheet", sprites.rainbowArt[m.sticker.sprite], m.x, m.y + lift, 54, 42)) textCenter(m.sticker.icon, m.x, m.y + lift, 36);
+          if (!drawSpriteWithGlow("rainbowArtSheet", sprites.rainbowArt[m.sticker.sprite], m.x, m.y + lift, 54, 42, "rgba(255,255,255,0.28)", 12)) textCenter(m.sticker.icon, m.x, m.y + lift, 36);
         } else {
-          if (!drawSprite("rainbowArtSheet", sprites.rainbowArt.spark, m.x, m.y, 52, 36)) textCenter("✨", m.x, m.y, 34);
+          if (!drawSpriteWithGlow("rainbowArtSheet", sprites.rainbowArt.spark, m.x, m.y, 52, 36, "rgba(255,246,109,0.45)", 18)) textCenter("✨", m.x, m.y, 34);
         }
       });
       ctx.restore();
-      glossyRect(60, 548, 840, 52, 18, "rgba(255,255,255,0.22)", false);
+      drawSoftPanel(60, 548, 840, 52, 18, "rgba(255,255,255,0.22)");
       textCenter("Paint " + paintCount + "  •  Stickers " + stampCount + "  •  Gallery " + doneCount, W / 2, 574, 24);
       drawParticles();
       if (this.done) drawEndOverlay("Gallery saved", "Final score " + this.score);
@@ -1771,4 +2015,5 @@ backBtn.addEventListener("click", backToHub);
 restartBtn.addEventListener("click", () => activeId && startGame(activeId));
 surpriseBtn.addEventListener("click", () => startGame(choice(gameDefs).id));
 bindCanvas();
+configureCanvas();
 renderCards();

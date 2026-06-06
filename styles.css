@@ -19,10 +19,10 @@ body {
   min-height: 100%;
   margin: 0;
   background:
-    linear-gradient(rgba(9,20,54,0.12), rgba(9,20,54,0.12)),
+    radial-gradient(circle at 18% 10%, rgba(255,246,109,0.18), transparent 28rem),
+    radial-gradient(circle at 86% 18%, rgba(84,198,235,0.16), transparent 24rem),
+    linear-gradient(rgba(9,20,54,0.08), rgba(9,20,54,0.14)),
     url("assets/generated/hub-backdrop.png") center top / cover fixed,
-    linear-gradient(135deg, rgba(255,255,255,0.08) 25%, transparent 25%) 0 0 / 48px 48px,
-    linear-gradient(225deg, rgba(255,255,255,0.06) 25%, transparent 25%) 0 0 / 48px 48px,
     linear-gradient(135deg, #0c71d9 0%, #7c3aed 42%, #ff5c8a 72%, #ffd166 100%);
   background-attachment: fixed;
   color: var(--ink);
@@ -63,8 +63,9 @@ button {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(90deg, transparent 0 6px, rgba(255,255,255,0.1) 6px 8px, transparent 8px 18px),
-    linear-gradient(180deg, rgba(255,255,255,0.08), transparent 35%);
+    radial-gradient(circle at 22% 18%, rgba(255,255,255,0.18), transparent 14rem),
+    radial-gradient(circle at 78% 28%, rgba(255,255,255,0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 42%);
   mask-image: linear-gradient(180deg, #000, transparent 78%);
   opacity: 0.55;
   pointer-events: none;
@@ -157,10 +158,10 @@ h1 {
   margin-bottom: 18px;
   padding: clamp(20px, 4vw, 34px);
   border: 1px solid var(--line);
-  border-radius: 32px;
+  border-radius: 26px;
   background:
-    linear-gradient(135deg, rgba(255,255,255,0.34), rgba(255,255,255,0.14)),
-    radial-gradient(circle at 72% 30%, rgba(255,255,255,0.28), transparent 22rem);
+    linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.12)),
+    radial-gradient(circle at 72% 30%, rgba(255,246,109,0.2), transparent 22rem);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 28px 80px rgba(50, 23, 120, 0.32);
@@ -168,16 +169,18 @@ h1 {
 }
 
 .hero::after {
-  content: "✦ ◆ ★ ✦ ◆ ★";
+  content: "";
   position: absolute;
   right: -24px;
   top: 10px;
-  width: 390px;
-  color: rgba(255,255,255,0.18);
-  font-size: 3.3rem;
-  font-weight: 950;
-  line-height: 1.25;
-  transform: rotate(-12deg);
+  width: 330px;
+  height: 180px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.3), transparent 58%),
+    linear-gradient(110deg, rgba(255,246,109,0.28), rgba(84,198,235,0.18), rgba(240,131,255,0.22));
+  filter: blur(2px);
+  transform: rotate(-10deg);
   pointer-events: none;
 }
 
@@ -254,16 +257,16 @@ h1 {
 
 .game-card {
   position: relative;
-  min-height: 230px;
-  padding: 18px 18px 52px;
+  min-height: 250px;
+  padding: 14px 16px 52px;
   overflow: hidden;
-  border: 2px solid rgba(255,255,255,0.34);
-  border-radius: 28px;
+  border: 1px solid rgba(255,255,255,0.42);
+  border-radius: 22px;
   background: var(--card-bg, var(--panel));
   color: white;
   text-align: left;
-  box-shadow: 0 20px 0 rgba(0,0,0,0.1), 0 28px 60px rgba(38, 20, 100, 0.28);
-  transition: transform 0.14s ease, border-color 0.14s ease;
+  box-shadow: 0 24px 64px rgba(22, 17, 69, 0.34);
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
 
 .game-card::before {
@@ -271,41 +274,69 @@ h1 {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(135deg, rgba(255,255,255,0.32), transparent 38%),
-    repeating-linear-gradient(135deg, rgba(255,255,255,0.12) 0 8px, transparent 8px 20px);
+    linear-gradient(135deg, rgba(255,255,255,0.28), transparent 42%),
+    radial-gradient(circle at 80% 20%, rgba(255,255,255,0.24), transparent 8rem);
   pointer-events: none;
 }
 
 .game-card::after {
   content: "";
   position: absolute;
-  right: -32px;
-  top: -32px;
-  width: 150px;
-  height: 150px;
-  border: 18px solid rgba(255,255,255,0.16);
-  border-radius: 38px;
-  transform: rotate(18deg);
+  right: -44px;
+  top: -34px;
+  width: 170px;
+  height: 170px;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2), transparent 66%);
   pointer-events: none;
 }
 
 .game-card:hover {
   border-color: rgba(255, 255, 255, 0.7);
   transform: translateY(-5px) scale(1.01);
+  box-shadow: 0 30px 76px rgba(22, 17, 69, 0.4);
+}
+
+.game-card .preview {
+  position: relative;
+  display: block;
+  height: 96px;
+  margin: 0 0 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.26);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), 0 14px 30px rgba(0,0,0,0.18);
+}
+
+.game-card .preview-art {
+  position: absolute;
+  inset: -46px -26px auto auto;
+  width: 230px;
+  height: 154px;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0.9;
+  filter: saturate(1.12) contrast(1.04);
+  pointer-events: none;
 }
 
 .game-card .icon {
-  position: relative;
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
   display: grid;
-  width: 78px;
-  height: 78px;
+  width: 58px;
+  height: 58px;
   place-items: center;
-  margin-bottom: 14px;
-  border: 2px solid rgba(255,255,255,0.34);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.28);
-  font-size: 2.55rem;
-  box-shadow: inset 0 -8px 0 rgba(0,0,0,0.08), 0 14px 28px rgba(0,0,0,0.16);
+  border: 1px solid rgba(255,255,255,0.42);
+  border-radius: 16px;
+  background: rgba(10, 15, 35, 0.34);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-size: 2rem;
+  box-shadow: 0 14px 28px rgba(0,0,0,0.18);
 }
 
 .game-card h3 {
@@ -386,10 +417,10 @@ h1 {
 .stage-wrap {
   position: relative;
   overflow: hidden;
-  border: 2px solid rgba(255,255,255,0.38);
-  border-radius: 30px;
+  border: 1px solid rgba(255,255,255,0.42);
+  border-radius: 24px;
   background: #0c1020;
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), 0 28px 80px rgba(38,20,100,0.34);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 32px 90px rgba(24,16,78,0.4);
 }
 
 #gameCanvas,
@@ -399,6 +430,7 @@ h1 {
   aspect-ratio: 3 / 2;
   max-height: min(68vh, 760px);
   touch-action: none;
+  image-rendering: auto;
 }
 
 .dom-stage {

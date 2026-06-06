@@ -27,6 +27,11 @@ test("hub and every game opens on iPad viewport", async ({ page }) => {
     await page.locator(".game-card").nth(index).click();
     await expect(page.locator("#gameTitle")).toHaveText(names[index]);
     await expect(page.locator("#gameCanvas")).toBeVisible();
+    await expect.poll(async () => page.evaluate(() => {
+      const canvas = document.querySelector("#gameCanvas");
+      const rect = canvas.getBoundingClientRect();
+      return canvas.width > rect.width && canvas.height > rect.height;
+    })).toBe(true);
     const box = await page.locator("#gameCanvas").boundingBox();
     await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
     if (names[index] === "Gem Pop Arcade") {
