@@ -22,7 +22,7 @@ body {
     radial-gradient(circle at 18% 10%, rgba(255,246,109,0.18), transparent 28rem),
     radial-gradient(circle at 86% 18%, rgba(84,198,235,0.16), transparent 24rem),
     linear-gradient(rgba(9,20,54,0.08), rgba(9,20,54,0.14)),
-    url("assets/generated/hub-backdrop.png") center top / cover fixed,
+    url("assets/generated/hub-backdrop.jpg") center top / cover fixed,
     linear-gradient(135deg, #0c71d9 0%, #7c3aed 42%, #ff5c8a 72%, #ffd166 100%);
   background-attachment: fixed;
   color: var(--ink);
@@ -43,6 +43,25 @@ button {
   font: inherit;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+button:focus-visible,
+canvas:focus-visible,
+.play:focus-visible {
+  outline: 4px solid #fff66d;
+  outline-offset: 4px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .hidden { display: none !important; }
@@ -416,6 +435,9 @@ h1 {
 
 .stage-wrap {
   position: relative;
+  width: min(100%, calc((100dvh - 300px) * 1.5));
+  aspect-ratio: 3 / 2;
+  margin-inline: auto;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.42);
   border-radius: 24px;
@@ -427,8 +449,7 @@ h1 {
 .dom-stage {
   display: block;
   width: 100%;
-  aspect-ratio: 3 / 2;
-  max-height: min(68vh, 760px);
+  height: 100%;
   touch-action: none;
   image-rendering: auto;
 }
@@ -506,4 +527,33 @@ h1 {
   .game-grid { grid-template-columns: 1fr; }
   .stats > div { min-width: 0; padding: 10px 8px; }
   .dom-stage { min-height: 620px; }
+}
+
+@media (orientation: landscape) and (max-height: 900px) {
+  .shell { padding-top: 10px; padding-bottom: 10px; }
+  .playbar { margin-bottom: 6px; }
+  .playbar h2 { font-size: clamp(1.2rem, 3.2vw, 2rem); }
+  .stats { margin-bottom: 6px; }
+  .stats > div { padding: 6px 10px; }
+  .stats span { font-size: 1.1rem; }
+  .controls { min-height: 46px; padding-top: 6px; }
+  .control-btn,
+  .secondary-btn,
+  .icon-btn { min-height: 44px; }
+  .hint { margin-top: 2px; font-size: 0.82rem; }
+  .play::after { display: none; }
+  .stage-wrap { width: min(100%, calc((100dvh - 245px) * 1.5)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  html,
+  body { background-attachment: scroll; }
 }

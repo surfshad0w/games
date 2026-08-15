@@ -1,3 +1,6 @@
+import { createAssetLoader } from "./src/core/assets.js";
+import { readSave, writeSave } from "./src/core/storage.js";
+
 const canvas = document.querySelector("#gameCanvas");
 const ctx = canvas.getContext("2d");
 const hub = document.querySelector("#hub");
@@ -6,6 +9,7 @@ const grid = document.querySelector("#gameGrid");
 const domStage = document.querySelector("#domStage");
 const controls = document.querySelector("#controls");
 const hint = document.querySelector("#hint");
+const status = document.querySelector("#status");
 const totalStars = document.querySelector("#totalStars");
 const statScore = document.querySelector("#statScore");
 const statBest = document.querySelector("#statBest");
@@ -16,54 +20,48 @@ const statTimeLabel = document.querySelector("#statTimeLabel");
 const gameTitle = document.querySelector("#gameTitle");
 const gameKicker = document.querySelector("#gameKicker");
 const restartBtn = document.querySelector("#restartBtn");
+const pauseBtn = document.querySelector("#pauseBtn");
 const backBtn = document.querySelector("#backBtn");
 const surpriseBtn = document.querySelector("#surpriseBtn");
 
 const W = 960;
 const H = 640;
 let canvasDpr = 1;
-const storageKey = "ara-games-v1";
-const defaultSave = { best: {}, stars: {}, avatar: {} };
-function readSave() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey) || "{}");
-    return {
-      best: parsed && typeof parsed.best === "object" && !Array.isArray(parsed.best) ? parsed.best : {},
-      stars: parsed && typeof parsed.stars === "object" && !Array.isArray(parsed.stars) ? parsed.stars : {},
-      avatar: parsed && typeof parsed.avatar === "object" && !Array.isArray(parsed.avatar) ? parsed.avatar : {}
-    };
-  } catch {
-    localStorage.removeItem(storageKey);
-    return { ...defaultSave };
-  }
-}
-const save = readSave();
+const storageKey = "ara-games-v2";
+const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+let saveFlushTimer = 0;
+let saveDirty = false;
+const save = readSave(localStorage, storageKey, "ara-games-v1");
 let activeGame = null;
 let activeId = null;
+let lastCard = null;
 let lastTime = 0;
 let running = false;
+let pagePaused = false;
+let gamePaused = false;
+let lastStatsText = "";
 let pointer = { x: 0, y: 0, down: false, justDown: false, justUp: false };
 let particles = [];
-const art = {};
-
-function loadArt(name, src) {
-  const img = new Image();
-  img.src = src;
-  art[name] = img;
-}
-
-[
-  ["puppy", "assets/puppy.svg"],
-  ["starTreat", "assets/star-treat.svg"],
-  ["puddle", "assets/puddle.svg"],
-  ["tree", "assets/tree.svg"],
-  ["cloud", "assets/cloud.svg"],
-  ["gemSheet", "assets/generated/gem-pop-sprites.png"],
-  ["petSheet", "assets/generated/pet-rescue-sprites.png"],
-  ["spaceSheet", "assets/generated/space-miner-sprites.png"],
-  ["golfSheet", "assets/generated/mini-golf-sprites.png"],
-  ["rainbowArtSheet", "assets/generated/new-games/rainbow-art-studio.png"]
-].forEach(([name, src]) => loadArt(name, src));
+const artSources = {
+  puppy: "assets/puppy.svg",
+  starTreat: "assets/star-treat.svg",
+  puddle: "assets/puddle.svg",
+  tree: "assets/tree.svg",
+  cloud: "assets/cloud.svg",
+  gemSheet: "assets/generated/gem-pop-sprites.png",
+  petSheet: "assets/generated/pet-rescue-sprites.png",
+  spaceSheet: "assets/generated/space-miner-sprites.png",
+  golfSheet: "assets/generated/mini-golf-sprites.png",
+  rainbowArtSheet: "assets/generated/new-games/rainbow-art-studio.png"
+};
+const { assets: art, load: loadArt, loadGame: loadGameArt } = createAssetLoader(artSources, {
+  "gem-pop": ["gemSheet"],
+  "pet-rescue": ["petSheet"],
+  "space-miner": ["spaceSheet"],
+  "mini-golf": ["golfSheet"],
+  "rainbow-art": ["rainbowArtSheet"]
+});
+["puppy", "starTreat", "puddle", "tree", "cloud"].forEach(loadArt);
 
 const sprites = {
   gems: [
@@ -123,7 +121,7 @@ const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 function configureCanvas() {
-  const nextDpr = clamp(window.devicePixelRatio || 1, 1, 3);
+  const nextDpr = clamp(window.devicePixelRatio || 1, 1, 2);
   const targetW = Math.round(W * nextDpr);
   const targetH = Math.round(H * nextDpr);
   if (canvas.width !== targetW || canvas.height !== targetH) {
@@ -150,6 +148,7 @@ function resetCanvasState() {
 }
 
 function burst(x, y, colors, count = 18, power = 240) {
+  if (reduceMotion) count = Math.ceil(count * 0.35);
   for (let i = 0; i < count; i++) {
     const a = rand(0, Math.PI * 2);
     const v = rand(power * 0.35, power);
@@ -269,9 +268,29 @@ function drawSpriteWithGlow(sheet, rect, x, y, w, h, glow = "rgba(255,255,255,0.
   return drew;
 }
 
-function saveGame() {
-  localStorage.setItem(storageKey, JSON.stringify(save));
+function flushSave() {
+  if (!saveDirty) return;
+  try {
+    saveDirty = !writeSave(localStorage, storageKey, save);
+  } catch { saveDirty = false; }
   renderStars();
+}
+
+function saveGame(immediate = false) {
+  saveDirty = true;
+  renderStars();
+  if (immediate) {
+    if (saveFlushTimer) window.clearTimeout(saveFlushTimer);
+    saveFlushTimer = 0;
+    flushSave();
+    return;
+  }
+  if (!saveFlushTimer) {
+    saveFlushTimer = window.setTimeout(() => {
+      saveFlushTimer = 0;
+      flushSave();
+    }, 700);
+  }
 }
 
 function addScore(points) {
@@ -287,16 +306,27 @@ function addScore(points) {
 
 function renderStats() {
   const custom = activeGame?.stats?.();
-  statScore.textContent = custom?.score ?? (activeGame ? activeGame.score : 0);
-  statBest.textContent = custom?.best ?? (save.best[activeId] || 0);
-  statTime.textContent = custom?.third ?? (activeGame ? Math.max(0, Math.ceil(activeGame.time || 0)) : 0);
-  statScoreLabel.textContent = custom?.scoreLabel ?? "score";
-  statBestLabel.textContent = custom?.bestLabel ?? "best";
-  statTimeLabel.textContent = custom?.thirdLabel ?? "time";
+  const values = [
+    custom?.score ?? (activeGame ? activeGame.score : 0),
+    custom?.best ?? (save.best[activeId] || 0),
+    custom?.third ?? (activeGame ? Math.max(0, Math.ceil(activeGame.time || 0)) : 0),
+    custom?.scoreLabel ?? "score",
+    custom?.bestLabel ?? "best",
+    custom?.thirdLabel ?? "time"
+  ];
+  const key = values.join("|");
+  if (key === lastStatsText) return;
+  lastStatsText = key;
+  [statScore, statBest, statTime, statScoreLabel, statBestLabel, statTimeLabel].forEach((node, index) => { node.textContent = values[index]; });
 }
 
 function renderStars() {
   totalStars.textContent = Object.values(save.stars).reduce((sum, n) => sum + n, 0);
+}
+
+function setHint(message) {
+  hint.textContent = message;
+  if (status) status.textContent = message;
 }
 
 function scaleEvent(e) {
@@ -535,7 +565,7 @@ function makeControls(items) {
 }
 
 function loop(t) {
-  if (!running) return;
+  if (!running || pagePaused || gamePaused) return;
   const dt = Math.min(0.033, (t - lastTime) / 1000 || 0.016);
   lastTime = t;
   if (activeGame) {
@@ -555,6 +585,7 @@ function loop(t) {
 }
 
 function startGame(id) {
+  if (activeGame) saveGame(true);
   activeId = id;
   const def = games[id];
   activeGame?.destroy?.();
@@ -565,15 +596,21 @@ function startGame(id) {
   canvas.classList.remove("hidden");
   gameTitle.textContent = def.title;
   gameKicker.textContent = def.kicker;
-  hint.textContent = def.hint;
+  setHint(def.hint);
   restartBtn.textContent = "Restart";
+  loadGameArt(id);
   activeGame = def.create();
   if (location.hostname === "127.0.0.1" || location.hostname === "localhost") window.__araActiveGame = activeGame;
   activeGame.score = 0;
   activeGame.time = activeGame.time ?? 60;
+  lastStatsText = "";
+  gamePaused = false;
+  pauseBtn.textContent = "Pause";
+  pauseBtn.setAttribute("aria-pressed", "false");
   def.controls && makeControls(def.controls);
   hub.classList.add("hidden");
   play.classList.remove("hidden");
+  play.focus();
   lastTime = performance.now();
   if (!running) {
     running = true;
@@ -582,13 +619,28 @@ function startGame(id) {
 }
 
 function backToHub() {
+  saveGame(true);
   running = false;
+  gamePaused = false;
   activeGame?.destroy?.();
   activeGame = null;
   activeId = null;
   play.classList.add("hidden");
   hub.classList.remove("hidden");
   renderCards();
+  lastCard?.focus();
+}
+
+function togglePause() {
+  if (!activeGame || activeGame.done) return;
+  gamePaused = !gamePaused;
+  pauseBtn.textContent = gamePaused ? "Resume" : "Pause";
+  pauseBtn.setAttribute("aria-pressed", String(gamePaused));
+  setHint(gamePaused ? "Game paused. Tap Resume when you are ready." : games[activeId].hint);
+  if (!gamePaused) {
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
 }
 
 function gameOver(label = "Time!") {
@@ -596,8 +648,9 @@ function gameOver(label = "Time!") {
   activeGame.done = true;
   save.best[activeId] = Math.max(save.best[activeId] || 0, activeGame.score);
   save.stars[activeId] = Math.max(save.stars[activeId] || 0, Math.min(5, Math.floor(activeGame.score / games[activeId].starEvery)));
-  saveGame();
-  hint.textContent = label + " Score: " + activeGame.score + ". Tap Restart or pick another game.";
+    saveGame(true);
+  const message = label + " Score: " + activeGame.score + ". Tap Restart or pick another game.";
+  setHint(message);
 }
 
 const palettes = {
@@ -605,12 +658,12 @@ const palettes = {
 };
 
 const gameDefs = [
-  { id: "gem-pop", title: "Gem Pop Arcade", kicker: "Tap the matching gems", icon: "💎", thumb: "assets/generated/gem-pop-sprites.png", color: "linear-gradient(145deg, #9b2cff, #ff5f8e 55%, #ffd166)", desc: "Pop color groups before time runs out.", hint: "Tap big groups of matching gems. Bigger groups make bigger points.", starEvery: 120, create: createGemPop },
-  { id: "pet-rescue", title: "Pet Rescue Run", kicker: "Jump and collect", icon: "🐶", thumb: "assets/generated/pet-rescue-sprites.png", color: "linear-gradient(145deg, #0f9f7a, #54c6eb 58%, #ffd166)", desc: "Run, jump, grab treats, and rescue pets.", hint: "Use Jump to hop over puddles and collect treats.", starEvery: 80, controls: [{ id: "jump", label: "Jump" }], create: createPetRescue },
-  { id: "space-miner", title: "Space Miner", kicker: "Fly and dodge", icon: "🚀", thumb: "assets/generated/space-miner-sprites.png", color: "linear-gradient(145deg, #111642, #3d5cff 52%, #9b5cff)", desc: "Collect crystals while avoiding asteroids.", hint: "Drag anywhere to steer the ship.", starEvery: 100, create: createSpaceMiner },
-  { id: "fireline-rescue", title: "Fireline Rescue", kicker: "Spray and survive", icon: "🚒", thumb: "assets/generated/hub-backdrop.png", color: "linear-gradient(145deg, #24352c, #d9482e 62%, #ffd35e)", desc: "Move, aim, and put out wildfires before they escape.", hint: "Tap the canvas to start. Left side moves, right side aims and sprays. Keyboard: WASD or arrows plus Space.", starEvery: 260, create: createFirelineRescue },
-  { id: "mini-golf", title: "Mini Golf Madness", kicker: "Aim and putt", icon: "⛳", thumb: "assets/generated/mini-golf-sprites.png", color: "linear-gradient(145deg, #0f9f6e, #37d99e 52%, #ffd166)", desc: "Bounce around bumpers and sink putts.", hint: "Drag back from the ball, then let go to shoot.", starEvery: 55, create: createMiniGolf },
-  { id: "rainbow-art", title: "Rainbow Art Studio", kicker: "Paint and sticker", icon: "🖍️", thumb: "assets/generated/new-games/rainbow-art-studio.png", color: "linear-gradient(145deg, #ff5c8a, #54c6eb 54%, #37d99e)", desc: "Make bright scenes with brushes and stickers.", hint: "Pick a tool, then draw or stamp on the canvas. Finish the prompt for bonus stars.", starEvery: 70, create: createRainbowArtStudio }
+  { id: "gem-pop", title: "Gem Pop Arcade", kicker: "Tap the matching gems", icon: "💎", thumb: "assets/thumbs/gem-pop.jpg", color: "linear-gradient(145deg, #9b2cff, #ff5f8e 55%, #ffd166)", desc: "Pop color groups before time runs out.", hint: "Tap big groups of matching gems. Bigger groups make bigger points.", starEvery: 120, create: createGemPop },
+  { id: "pet-rescue", title: "Pet Rescue Run", kicker: "Jump and collect", icon: "🐶", thumb: "assets/thumbs/pet-rescue.jpg", color: "linear-gradient(145deg, #0f9f7a, #54c6eb 58%, #ffd166)", desc: "Run, jump, grab treats, and rescue pets.", hint: "Use Jump to hop over puddles and collect treats.", starEvery: 80, controls: [{ id: "jump", label: "Jump" }], create: createPetRescue },
+  { id: "space-miner", title: "Space Miner", kicker: "Fly and dodge", icon: "🚀", thumb: "assets/thumbs/space-miner.jpg", color: "linear-gradient(145deg, #111642, #3d5cff 52%, #9b5cff)", desc: "Collect crystals while avoiding asteroids.", hint: "Drag anywhere to steer the ship.", starEvery: 100, create: createSpaceMiner },
+  { id: "fireline-rescue", title: "Fireline Rescue", kicker: "Spray and survive", icon: "🚒", thumb: "assets/thumbs/fireline-rescue.jpg", color: "linear-gradient(145deg, #24352c, #d9482e 62%, #ffd35e)", desc: "Move, aim, and put out wildfires before they escape.", hint: "Tap the canvas to start. Left side moves, right side aims and sprays. Keyboard: WASD or arrows plus Space.", starEvery: 260, create: createFirelineRescue },
+  { id: "mini-golf", title: "Mini Golf Madness", kicker: "Aim and putt", icon: "⛳", thumb: "assets/thumbs/mini-golf.jpg", color: "linear-gradient(145deg, #0f9f6e, #37d99e 52%, #ffd166)", desc: "Bounce around bumpers and sink putts.", hint: "Drag back from the ball, then let go to shoot.", starEvery: 55, create: createMiniGolf },
+  { id: "rainbow-art", title: "Rainbow Art Studio", kicker: "Paint and sticker", icon: "🖍️", thumb: "assets/thumbs/rainbow-art.jpg", color: "linear-gradient(145deg, #ff5c8a, #54c6eb 54%, #37d99e)", desc: "Make bright scenes with brushes and stickers.", hint: "Pick a tool, then draw or stamp on the canvas. Finish the prompt for bonus stars.", starEvery: 70, create: createRainbowArtStudio }
 ];
 
 const games = Object.fromEntries(gameDefs.map((g) => [g.id, g]));
@@ -622,8 +675,9 @@ function renderCards() {
     card.type = "button";
     card.className = "game-card";
     card.style.setProperty("--card-bg", game.color);
-    card.innerHTML = '<span class="preview"><img class="preview-art" src="' + game.thumb + '" alt=""><span class="icon">' + game.icon + '</span></span><h3>' + game.title + '</h3><p>' + game.desc + '</p><span class="best">Best ' + (save.best[game.id] || 0) + '</span>';
-    card.addEventListener("click", () => startGame(game.id));
+    card.setAttribute("aria-label", game.title + ". " + game.desc);
+    card.innerHTML = '<span class="preview"><img class="preview-art" src="' + game.thumb + '" alt="" loading="lazy" decoding="async"><span class="icon" aria-hidden="true">' + game.icon + '</span></span><h3>' + game.title + '</h3><p>' + game.desc + '</p><span class="best">Best ' + (save.best[game.id] || 0) + ' · ★ ' + (save.stars[game.id] || 0) + '/5</span>';
+    card.addEventListener("click", () => { lastCard = card; startGame(game.id); });
     grid.append(card);
   });
   renderStars();
@@ -640,6 +694,7 @@ function createGemPop() {
   let board = newBoard();
   let pops = [];
   let endTitle = "";
+  let cursor = { c: 0, r: 0 };
   function colorCount() { return Math.min(colors.length, 3 + Math.floor((level - 1) / 2)); }
   function newBoard() {
     return Array.from({ length: rows }, () => Array.from({ length: cols }, () => Math.floor(rand(0, colorCount()))));
@@ -677,7 +732,7 @@ function createGemPop() {
     target = 120 + level * 70;
     board = newBoard();
     burst(W / 2, H / 2, ["#fff", "#ffd166", "#37d99e", "#f083ff"], 44, 420);
-    hint.textContent = "Level " + level + "! Bigger groups score faster.";
+    setHint("Level " + level + "! Bigger groups score faster.");
     activeGame.time = Math.min(activeGame.time + 18, 90);
   }
   function cellCenter(c, r) {
@@ -692,6 +747,14 @@ function createGemPop() {
       endTitle = "You cleared every level!";
       addScore(150);
       gameOver("All levels cleared!");
+    },
+    keyDown(key) {
+      if (this.done) return;
+      if (key === "arrowleft") cursor.c = clamp(cursor.c - 1, 0, cols - 1);
+      else if (key === "arrowright") cursor.c = clamp(cursor.c + 1, 0, cols - 1);
+      else if (key === "arrowup") cursor.r = clamp(cursor.r - 1, 0, rows - 1);
+      else if (key === "arrowdown") cursor.r = clamp(cursor.r + 1, 0, rows - 1);
+      else if (key === "enter" || key === " ") this.pointerDown(ox + cursor.c * cell + cell / 2, oy + cursor.r * cell + cell / 2);
     },
     pointerDown(x, y) {
       if (this.done) return;
@@ -744,6 +807,11 @@ function createGemPop() {
           ctx.beginPath(); ctx.arc(x + 36, y + 38, 14, 0, Math.PI * 2); ctx.fill();
         }
       }
+      ctx.strokeStyle = "#fff66d";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.roundRect(ox + cursor.c * cell + 5, oy + cursor.r * cell + 5, cell - 10, cell - 10, 18);
+      ctx.stroke();
       pops.forEach((p) => {
         ctx.globalAlpha = clamp(p.t / 0.25, 0, 1);
         radialGlow(p.x, p.y, 62, "rgba(255,255,255,0.28)");
@@ -796,6 +864,8 @@ function createPetRescue() {
     control(id, down) { if (id !== "jump") return; jumpHeld = down; if (down) startJump(); },
     pointerDown() { this.control("jump", true); },
     pointerUp() { this.control("jump", false); },
+    keyDown(key) { if (key === " " || key === "arrowup" || key === "w") this.control("jump", true); },
+    keyUp(key) { if (key === " " || key === "arrowup" || key === "w") this.control("jump", false); },
     stats() {
       return { score: this.score, best: save.best[activeId] || 0, third: health, thirdLabel: "hearts" };
     },
@@ -830,7 +900,7 @@ function createPetRescue() {
         hurtFlash = 0.55;
         addScore(-12);
         burst(player.x, player.y, ["#4f79b8", "#8bd3ff", "#fff"], 18, 260);
-        hint.textContent = health > 0 ? "Splash! " + health + " hearts left." : "Too many splashes!";
+        setHint(health > 0 ? "Splash! " + health + " hearts left." : "Too many splashes!");
         if (health <= 0) gameOver("Rescue run over!");
       }
     },
@@ -900,6 +970,15 @@ function createSpaceMiner() {
     },
     pointerDown(x, y) { target = { x, y }; },
     pointerMove(x, y) { if (pointer.down) target = { x, y }; },
+    keyDown(key) {
+      const step = 90;
+      if (key === "arrowleft" || key === "a") target.x -= step;
+      if (key === "arrowright" || key === "d") target.x += step;
+      if (key === "arrowup" || key === "w") target.y -= step;
+      if (key === "arrowdown" || key === "s") target.y += step;
+      target.x = clamp(target.x, 55, W - 55);
+      target.y = clamp(target.y, 70, H - 55);
+    },
     update(dt) {
       if (this.done) return;
       elapsed += dt;
@@ -923,7 +1002,7 @@ function createSpaceMiner() {
         invulnerable = 1.2;
         addScore(-18);
         burst(ship.x, ship.y, ["#ff6b6b", "#fff", "#ffd166"], 24, 340);
-        hint.textContent = health > 0 ? "Hit! " + health + " shields left." : "Ship broke!";
+        setHint(health > 0 ? "Hit! " + health + " shields left." : "Ship broke!");
         if (health <= 0) gameOver("Ship broke!");
       }
       crystals = crystals.filter((c) => c.x > -80 && !c.got); rocks = rocks.filter((r) => r.x > -100 && !r.hit);
@@ -951,6 +1030,7 @@ function createSpaceMiner() {
       if (!drawSpriteWithGlow("spaceSheet", sprites.space.rocket, ship.x, ship.y, 104, 58, "rgba(255,255,255,0.28)", 16)) textCenter("🚀", ship.x, ship.y, 70);
       ctx.globalAlpha = 1;
       drawParticles();
+      if (this.done) drawEndOverlay("Flight over", "Final score " + this.score);
     }
   };
 }
@@ -958,6 +1038,9 @@ function createSpaceMiner() {
 function createFirelineRescue() {
   const FW = 1366;
   const FH = 1024;
+  const fireScale = Math.min(W / FW, H / FH);
+  const fireOffsetX = (W - FW * fireScale) / 2;
+  const fireOffsetY = (H - FH * fireScale) / 2;
   const input = {
     movePointer: null,
     aimPointer: null,
@@ -982,6 +1065,8 @@ function createFirelineRescue() {
   let comboTimer = 0;
   let bonusText = "Ready";
   let bonusTimer = 0;
+  let waterEmitAccumulator = 0;
+  let survivalScoreAccumulator = 0;
   let messageTitle = "Fireline Rescue";
   let messageBody = "Move with your left thumb. Aim and spray with your right thumb. Keep putting out fires for the highest score.";
   let messageButton = "Tap to start";
@@ -1035,8 +1120,10 @@ function createFirelineRescue() {
       updateFireline(dt);
     },
     draw() {
+      ctx.clearRect(0, 0, W, H);
       ctx.save();
-      ctx.scale(W / FW, H / FH);
+      ctx.translate(fireOffsetX, fireOffsetY);
+      ctx.scale(fireScale, fireScale);
       drawFireline();
       ctx.restore();
     },
@@ -1076,6 +1163,8 @@ function createFirelineRescue() {
     comboTimer = 0;
     bonusText = "Ready";
     bonusTimer = 0;
+    waterEmitAccumulator = 0;
+    survivalScoreAccumulator = 0;
     input.movePointer = null;
     input.aimPointer = null;
     input.spraying = false;
@@ -1090,11 +1179,14 @@ function createFirelineRescue() {
 
   function startRound() {
     state = "playing";
-    hint.textContent = "Left side moves. Right side aims and sprays. Try short sprays to save water.";
+    setHint("Left side moves. Right side aims and sprays. Try short sprays to save water.");
   }
 
   function toFirePoint(x, y) {
-    return { x: (x / W) * FW, y: (y / H) * FH };
+    return {
+      x: clamp((x - fireOffsetX) / fireScale, 0, FW),
+      y: clamp((y - fireOffsetY) / fireScale, 0, FH)
+    };
   }
 
   function pointerId(event) {
@@ -1175,7 +1267,12 @@ function createFirelineRescue() {
     bonusTimer = Math.max(0, bonusTimer - dt);
     if (comboTimer === 0) combo = 1;
     if (bonusTimer === 0) bonusText = input.spraying ? "Spraying" : "Hold line";
-    award(Math.floor(dt * (4 + currentDifficulty())), "", false);
+    survivalScoreAccumulator += dt * (4 + currentDifficulty());
+    const survivalPoints = Math.floor(survivalScoreAccumulator);
+    if (survivalPoints > 0) {
+      survivalScoreAccumulator -= survivalPoints;
+      award(survivalPoints, "", false);
+    }
     moveFirefighter(dt);
     firefighter.angle = Math.atan2(input.aim.y - firefighter.y, input.aim.x - firefighter.x);
 
@@ -1311,7 +1408,9 @@ function createFirelineRescue() {
 
   function emitWater(dt) {
     const nozzle = hoseNozzle();
-    const count = Math.ceil(32 * dt);
+    waterEmitAccumulator += 32 * dt;
+    const count = Math.floor(waterEmitAccumulator);
+    waterEmitAccumulator -= count;
     for (let i = 0; i < count; i += 1) {
       const spread = (Math.random() - 0.5) * 0.24;
       const speed = 760 + Math.random() * 120;
@@ -1327,7 +1426,7 @@ function createFirelineRescue() {
     }
   }
 
-  function handleWaterHits(dt) {
+  function handleWaterHits() {
     for (const fire of fires) {
       if (fire.health <= 0) continue;
       const hitRadius = 54 * fire.size;
@@ -1336,7 +1435,7 @@ function createFirelineRescue() {
         const distance = Math.hypot(drop.x - fire.x, drop.y - fire.y);
         if (distance < hitRadius + drop.radius) {
           drop.life = 0;
-          fire.health -= 52 * dt + 5;
+          fire.health -= 5.6;
           fire.hot = 1;
           award(Math.round(3 * fire.typeStats.score), "hit");
           steamPuffs.push({
@@ -1778,6 +1877,7 @@ function createFirelineRescue() {
   }
 
   function onKeyDown(event) {
+    if (event.target instanceof HTMLElement && ["BUTTON", "INPUT", "SELECT"].includes(event.target.tagName)) return;
     const key = event.key.toLowerCase();
     if (!["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d", " "].includes(key)) return;
     event.preventDefault();
@@ -1787,6 +1887,7 @@ function createFirelineRescue() {
   }
 
   function onKeyUp(event) {
+    if (event.target instanceof HTMLElement && ["BUTTON", "INPUT", "SELECT"].includes(event.target.tagName)) return;
     const key = event.key.toLowerCase();
     input.keys.delete(key);
     if (event.key === " ") input.spraying = false;
@@ -1814,9 +1915,19 @@ function createMiniGolf() {
     pointerDown(x, y) { if (Math.hypot(x - ball.x, y - ball.y) < 80 && Math.hypot(ball.vx, ball.vy) < 20) { aiming = true; aim = { x, y }; } },
     pointerMove(x, y) { if (aiming) aim = { x, y }; },
     pointerUp(x, y) { if (!aiming) return; aiming = false; ball.vx = clamp((ball.x - x) * 4.5, -720, 720); ball.vy = clamp((ball.y - y) * 4.5, -720, 720); },
+    keyDown(key) {
+      if (key === "enter" || key === " ") {
+        const dx = hole.x - ball.x;
+        const dy = hole.y - ball.y;
+        ball.vx = clamp(dx * 2.5, -720, 720);
+        ball.vy = clamp(dy * 2.5, -720, 720);
+      }
+    },
     update(dt) {
       if (this.time <= 0) gameOver("Round over!");
-      ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.vx *= 0.988; ball.vy *= 0.988;
+      ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+      const friction = Math.pow(0.988, dt * 60);
+      ball.vx *= friction; ball.vy *= friction;
       if (ball.x < 38 || ball.x > W - 38) ball.vx *= -0.85; if (ball.y < 38 || ball.y > H - 38) ball.vy *= -0.85;
       ball.x = clamp(ball.x, 38, W - 38); ball.y = clamp(ball.y, 38, H - 38);
       bumpers.forEach((b) => { const d = Math.hypot(ball.x - b.x, ball.y - b.y); if (d < ball.r + b.r) { const nx = (ball.x - b.x) / d, ny = (ball.y - b.y) / d; ball.vx = nx * 420; ball.vy = ny * 420; } });
@@ -1870,6 +1981,7 @@ function createMiniGolf() {
       if (!drawSpriteWithGlow("golfSheet", sprites.golf.ball, ball.x, ball.y, 42, 42, "rgba(255,255,255,0.35)", 10)) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill(); }
       ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
       drawParticles();
+      if (this.done) drawEndOverlay("Round over", "Final score " + this.score);
     }
   };
 }
@@ -1894,12 +2006,16 @@ function createRainbowArtStudio() {
   const scenes = ["castle", "garden", "rocket", "ocean", "party"];
   let scene = 0, tool = "brush", color = colors[0], sticker = 0, bg = "#fff8d8";
   let marks = [], stampCount = 0, paintCount = 0, doneCount = 0, drawing = false, bounce = 0;
+  let lastBrushPoint = null;
   const area = { x: 60, y: 150, w: 840, h: 370 };
   function inArea(x, y) { return x > area.x && x < area.x + area.w && y > area.y && y < area.y + area.h; }
   function addMark(x, y) {
     if (!inArea(x, y)) return;
     if (tool === "brush") {
+      if (lastBrushPoint && Math.hypot(x - lastBrushPoint.x, y - lastBrushPoint.y) < 10) return;
       marks.push({ type: "dot", x, y, color, r: rand(10, 22) });
+      lastBrushPoint = { x, y };
+      if (marks.length > 900) marks.splice(0, marks.length - 900);
       paintCount += 1;
       addScore(1);
     } else if (tool === "sticker") {
@@ -1916,7 +2032,7 @@ function createRainbowArtStudio() {
       bg = color;
       addScore(5);
     }
-    if (stampCount >= 3 && paintCount >= 8) hint.textContent = "Prompt ready. Tap Done when you like it.";
+    if (stampCount >= 3 && paintCount >= 8) setHint("Prompt ready. Tap Done when you like it.");
   }
   return {
     time: 120,
@@ -1932,7 +2048,7 @@ function createRainbowArtStudio() {
           doneCount += 1;
           addScore(bonus);
           burst(W / 2, 112, ["#ffd166", "#fff", "#37d99e", "#f083ff"], 34, 330);
-          hint.textContent = "Saved to the tiny gallery. New scene!";
+          setHint("Saved to the tiny gallery. New scene!");
           marks = [];
           stampCount = 0;
           paintCount = 0;
@@ -1941,7 +2057,7 @@ function createRainbowArtStudio() {
           return;
         }
         tool = topTool.id;
-        hint.textContent = topTool.label + " selected.";
+        setHint(topTool.label + " selected.");
         return;
       }
       const swatch = colors.find((c, i) => x > 670 + i * 38 && x < 702 + i * 38 && y > 96 && y < 128);
@@ -1955,7 +2071,16 @@ function createRainbowArtStudio() {
     pointerMove(x, y) {
       if (drawing && tool === "brush") addMark(x, y);
     },
-    pointerUp() { drawing = false; },
+    pointerUp() { drawing = false; lastBrushPoint = null; },
+    keyDown(key) {
+      const toolIndex = Number(key) - 1;
+      if (toolIndex >= 0 && toolIndex < tools.length) {
+        tool = tools[toolIndex].id;
+        setHint(tools[toolIndex].label + " selected.");
+      } else if (key === "enter") {
+        this.pointerDown(64 + 4 * 118 + 51, 109);
+      }
+    },
     update(dt) {
       bounce = Math.max(0, bounce - dt);
       if (this.time <= 0) gameOver("Studio time!");
@@ -2012,8 +2137,27 @@ function createRainbowArtStudio() {
 }
 
 backBtn.addEventListener("click", backToHub);
+pauseBtn.addEventListener("click", togglePause);
 restartBtn.addEventListener("click", () => activeId && startGame(activeId));
 surpriseBtn.addEventListener("click", () => startGame(choice(gameDefs).id));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && activeGame) togglePause();
+  if (activeGame && !event.repeat && event.target === canvas) activeGame.keyDown?.(event.key.toLowerCase());
+});
+document.addEventListener("keyup", (event) => {
+  if (event.target === canvas) activeGame?.keyUp?.(event.key.toLowerCase());
+});
+document.addEventListener("visibilitychange", () => {
+  pagePaused = document.hidden;
+  if (!pagePaused && running) {
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
+});
+window.addEventListener("pagehide", () => saveGame(true));
 bindCanvas();
 configureCanvas();
 renderCards();
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+  navigator.serviceWorker.register("service-worker.js").catch(() => {});
+}

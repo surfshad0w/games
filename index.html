@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#141827">
-  <title>games.araand.co</title>
+  <meta name="description" content="Fast, silly, touch-friendly arcade games for iPad play.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <title>Ara Games — iPad arcade</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -29,13 +35,14 @@
       <section id="gameGrid" class="game-grid" aria-label="Games"></section>
     </section>
 
-    <section id="play" class="play hidden" aria-live="polite">
+    <section id="play" class="play hidden" tabindex="-1" aria-labelledby="gameTitle">
       <header class="playbar">
         <button id="backBtn" class="icon-btn" type="button" aria-label="Back to games">‹</button>
         <div>
           <p id="gameKicker" class="eyebrow">Now playing</p>
           <h2 id="gameTitle">Game</h2>
         </div>
+        <button id="pauseBtn" class="secondary-btn" type="button" aria-pressed="false">Pause</button>
         <button id="restartBtn" class="secondary-btn" type="button">Restart</button>
       </header>
 
@@ -46,15 +53,16 @@
       </div>
 
       <div class="stage-wrap">
-        <canvas id="gameCanvas" width="960" height="640" aria-label="Game canvas"></canvas>
+        <canvas id="gameCanvas" width="960" height="640" tabindex="0" aria-label="Game canvas" aria-describedby="hint"></canvas>
         <div id="domStage" class="dom-stage hidden"></div>
       </div>
 
       <div id="controls" class="controls"></div>
       <p id="hint" class="hint"></p>
+      <p id="status" class="sr-only" role="status" aria-live="polite"></p>
     </section>
   </main>
 
-  <script src="app.js?v=20260602-fireline-2"></script>
+    <script type="module" src="app.js?v=20260815-runtime-2"></script>
 </body>
 </html>
